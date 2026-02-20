@@ -1044,7 +1044,14 @@ async function startHTTP(port: number): Promise<void> {
     });
 
   const httpServer = createServer(async (req: IncomingMessage, res: ServerResponse) => {
-    // Optional bearer-token auth
+    // Health-check endpoint — always public, no auth required
+    if (req.url === '/health' && req.method === 'GET') {
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ status: 'ok', server: 'fluentcrm-mcp' }));
+      return;
+    }
+
+    // Optional bearer-token auth (applied to all other routes)
     if (AUTH_TOKEN) {
       const auth = req.headers['authorization'] || '';
       if (!auth.startsWith('Bearer ') || auth.slice(7) !== AUTH_TOKEN) {
@@ -1054,11 +1061,16 @@ async function startHTTP(port: number): Promise<void> {
       }
     }
 
-    // Health-check endpoint
-    if (req.url === '/health' && req.method === 'GET') {
-      res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ status: 'ok', server: 'fluentcrm-mcp' }));
-      return;
+    // Ensure Accept header satisfies MCP Streamable HTTP requirements.
+    // Some agents/clients omit text/event-stream — inject it so the SDK
+    // doesn't return 406 Not Acceptable.
+    if (req.url?.startsWith('/mcp')) {
+      const accept = req.headers['accept'] || '';
+      if (!accept.includes('text/event-stream')) {
+        req.headers['accept'] = accept
+          ? `${accept}, text/event-stream`
+          : 'application/json, text/event-stream';
+      }
     }
 
     const url = new URL(req.url || '/', `http://localhost:${port}`);
