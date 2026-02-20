@@ -87,9 +87,11 @@ class FluentCRMClient {
     state?: string;
     country?: string;
     postal_code?: string;
+    status?: string;
     [key: string]: any;
   }) {
-    const response = await this.apiClient.post('/subscribers', data);
+    const payload = { status: 'subscribed', ...data };
+    const response = await this.apiClient.post('/subscribers', payload);
     return response.data;
   }
 
@@ -536,6 +538,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
             address_line_1: { type: 'string', description: t('fluentcrm_create_contact', 'address_line_1') },
             city: { type: 'string', description: t('fluentcrm_create_contact', 'city') },
             country: { type: 'string', description: t('fluentcrm_create_contact', 'country') },
+            status: { type: 'string', description: 'Contact status: subscribed, pending, unsubscribed, bounced. Defaults to subscribed.' },
           },
           required: ['email'],
         },
