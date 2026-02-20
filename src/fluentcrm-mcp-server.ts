@@ -482,65 +482,65 @@ const server = new Server(
 server.setRequestHandler(ListToolsRequestSchema, async () => {
   return {
     tools: [
-      // ===== KONTAKTY =====
+      // ===== CONTACTS =====
       {
         name: 'fluentcrm_list_contacts',
-        description: 'Pobiera listę wszystkich kontaktów z FluentCRM',
+        description: 'Retrieves a list of all contacts from FluentCRM',
         inputSchema: {
           type: 'object',
           properties: {
-            page: { type: 'number', description: 'Numer strony (default: 1)' },
-            per_page: { type: 'number', description: 'Ilość rekordów na stronę (default: 10)' },
-            search: { type: 'string', description: 'Szukaj po emailu/imieniu' },
+            page: { type: 'number', description: 'Page number (default: 1)' },
+            per_page: { type: 'number', description: 'Records per page (default: 10)' },
+            search: { type: 'string', description: 'Search by email or name' },
           },
         },
       },
       {
         name: 'fluentcrm_get_contact',
-        description: 'Pobiera szczegóły konkretnego kontaktu',
+        description: 'Retrieves details of a specific contact',
         inputSchema: {
           type: 'object',
           properties: {
-            subscriberId: { type: 'number', description: 'ID kontaktu' },
+            subscriberId: { type: 'number', description: 'Contact ID' },
           },
           required: ['subscriberId'],
         },
       },
       {
         name: 'fluentcrm_find_contact_by_email',
-        description: 'Wyszukuje kontakt po adresie email',
+        description: 'Finds a contact by email address',
         inputSchema: {
           type: 'object',
           properties: {
-            email: { type: 'string', description: 'Adres email' },
+            email: { type: 'string', description: 'Email address' },
           },
           required: ['email'],
         },
       },
       {
         name: 'fluentcrm_create_contact',
-        description: 'Tworzy nowy kontakt w FluentCRM',
+        description: 'Creates a new contact in FluentCRM',
         inputSchema: {
           type: 'object',
           properties: {
-            email: { type: 'string', description: 'Email kontaktu' },
-            first_name: { type: 'string', description: 'Imię' },
-            last_name: { type: 'string', description: 'Nazwisko' },
-            phone: { type: 'string', description: 'Numer telefonu' },
-            address_line_1: { type: 'string', description: 'Adres' },
-            city: { type: 'string', description: 'Miasto' },
-            country: { type: 'string', description: 'Kraj' },
+            email: { type: 'string', description: 'Contact email' },
+            first_name: { type: 'string', description: 'First name' },
+            last_name: { type: 'string', description: 'Last name' },
+            phone: { type: 'string', description: 'Phone number' },
+            address_line_1: { type: 'string', description: 'Address' },
+            city: { type: 'string', description: 'City' },
+            country: { type: 'string', description: 'Country' },
           },
           required: ['email'],
         },
       },
       {
         name: 'fluentcrm_update_contact',
-        description: 'Aktualizuje dane kontaktu',
+        description: 'Updates contact details',
         inputSchema: {
           type: 'object',
           properties: {
-            subscriberId: { type: 'number', description: 'ID kontaktu' },
+            subscriberId: { type: 'number', description: 'Contact ID' },
             first_name: { type: 'string' },
             last_name: { type: 'string' },
             phone: { type: 'string' },
@@ -550,81 +550,81 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
       },
       {
         name: 'fluentcrm_delete_contact',
-        description: 'Usuwa kontakt z FluentCRM',
+        description: 'Deletes a contact from FluentCRM',
         inputSchema: {
           type: 'object',
           properties: {
-            subscriberId: { type: 'number', description: 'ID kontaktu do usunięcia' },
+            subscriberId: { type: 'number', description: 'ID of the contact to delete' },
           },
           required: ['subscriberId'],
         },
       },
 
-      // ===== TAGI =====
+      // ===== TAGS =====
       {
         name: 'fluentcrm_list_tags',
-        description: 'Pobiera wszystkie tagi z FluentCRM',
+        description: 'Retrieves all tags from FluentCRM',
         inputSchema: {
           type: 'object',
           properties: {
-            page: { type: 'number', description: 'Numer strony' },
-            search: { type: 'string', description: 'Szukaj tagu' },
+            page: { type: 'number', description: 'Page number' },
+            search: { type: 'string', description: 'Search tags' },
           },
         },
       },
       {
         name: 'fluentcrm_create_tag',
-        description: 'Tworzy nowy tag w FluentCRM',
+        description: 'Creates a new tag in FluentCRM',
         inputSchema: {
           type: 'object',
           properties: {
-            title: { type: 'string', description: 'Nazwa tagu (np. "AW-progress-75")' },
-            slug: { type: 'string', description: 'Slug tagu (np. "aw-progress-75")' },
-            description: { type: 'string', description: 'Opis tagu' },
+            title: { type: 'string', description: 'Tag name (e.g. "AW-progress-75")' },
+            slug: { type: 'string', description: 'Tag slug (e.g. "aw-progress-75")' },
+            description: { type: 'string', description: 'Tag description' },
           },
           required: ['title'],
         },
       },
       {
         name: 'fluentcrm_delete_tag',
-        description: 'Usuwa tag z FluentCRM',
+        description: 'Deletes a tag from FluentCRM',
         inputSchema: {
           type: 'object',
           properties: {
-            tagId: { type: 'number', description: 'ID tagu' },
+            tagId: { type: 'number', description: 'Tag ID' },
           },
           required: ['tagId'],
         },
       },
       {
         name: 'fluentcrm_attach_tag_to_contact',
-        description: 'Przypisuje tag do kontaktu',
+        description: 'Attaches a tag to a contact',
         inputSchema: {
           type: 'object',
           properties: {
-            subscriberId: { type: 'number', description: 'ID kontaktu' },
-            tagIds: { type: 'array', items: { type: 'number' }, description: 'Lista ID tagów' },
+            subscriberId: { type: 'number', description: 'Contact ID' },
+            tagIds: { type: 'array', items: { type: 'number' }, description: 'List of tag IDs' },
           },
           required: ['subscriberId', 'tagIds'],
         },
       },
       {
         name: 'fluentcrm_detach_tag_from_contact',
-        description: 'Usuwa tag z kontaktu',
+        description: 'Removes a tag from a contact',
         inputSchema: {
           type: 'object',
           properties: {
-            subscriberId: { type: 'number', description: 'ID kontaktu' },
-            tagIds: { type: 'array', items: { type: 'number' }, description: 'Lista ID tagów' },
+            subscriberId: { type: 'number', description: 'Contact ID' },
+            tagIds: { type: 'array', items: { type: 'number' }, description: 'List of tag IDs' },
           },
           required: ['subscriberId', 'tagIds'],
         },
       },
 
-      // ===== LISTY =====
+      // ===== LISTS =====
       {
         name: 'fluentcrm_list_lists',
-        description: 'Pobiera wszystkie listy z FluentCRM',
+        description: 'Retrieves all lists from FluentCRM',
         inputSchema: {
           type: 'object',
           properties: {},
@@ -632,57 +632,57 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
       },
       {
         name: 'fluentcrm_create_list',
-        description: 'Tworzy nową listę w FluentCRM',
+        description: 'Creates a new list in FluentCRM',
         inputSchema: {
           type: 'object',
           properties: {
-            title: { type: 'string', description: 'Nazwa listy' },
-            slug: { type: 'string', description: 'Slug listy' },
-            description: { type: 'string', description: 'Opis listy' },
+            title: { type: 'string', description: 'List name' },
+            slug: { type: 'string', description: 'List slug' },
+            description: { type: 'string', description: 'List description' },
           },
           required: ['title'],
         },
       },
       {
         name: 'fluentcrm_delete_list',
-        description: 'Usuwa listę z FluentCRM',
+        description: 'Deletes a list from FluentCRM',
         inputSchema: {
           type: 'object',
           properties: {
-            listId: { type: 'number', description: 'ID listy' },
+            listId: { type: 'number', description: 'List ID' },
           },
           required: ['listId'],
         },
       },
       {
         name: 'fluentcrm_attach_contact_to_list',
-        description: 'Przypisuje kontakt do listy',
+        description: 'Adds a contact to a list',
         inputSchema: {
           type: 'object',
           properties: {
-            subscriberId: { type: 'number', description: 'ID kontaktu' },
-            listIds: { type: 'array', items: { type: 'number' }, description: 'Lista ID list' },
+            subscriberId: { type: 'number', description: 'Contact ID' },
+            listIds: { type: 'array', items: { type: 'number' }, description: 'List of list IDs' },
           },
           required: ['subscriberId', 'listIds'],
         },
       },
       {
         name: 'fluentcrm_detach_contact_from_list',
-        description: 'Usuwa kontakt z listy',
+        description: 'Removes a contact from a list',
         inputSchema: {
           type: 'object',
           properties: {
-            subscriberId: { type: 'number', description: 'ID kontaktu' },
-            listIds: { type: 'array', items: { type: 'number' }, description: 'Lista ID list' },
+            subscriberId: { type: 'number', description: 'Contact ID' },
+            listIds: { type: 'array', items: { type: 'number' }, description: 'List of list IDs' },
           },
           required: ['subscriberId', 'listIds'],
         },
       },
 
-      // ===== KAMPANIE =====
+      // ===== CAMPAIGNS =====
       {
         name: 'fluentcrm_list_campaigns',
-        description: 'Pobiera listę kampanii email',
+        description: 'Retrieves a list of email campaigns',
         inputSchema: {
           type: 'object',
           properties: {
@@ -693,47 +693,47 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
       },
       {
         name: 'fluentcrm_create_campaign',
-        description: 'Tworzy nową kampanię email',
+        description: 'Creates a new email campaign',
         inputSchema: {
           type: 'object',
           properties: {
-            title: { type: 'string', description: 'Tytuł kampanii' },
-            subject: { type: 'string', description: 'Temat emaila' },
-            template_id: { type: 'number', description: 'ID szablonu' },
-            recipient_list: { type: 'array', items: { type: 'number' }, description: 'ID list' },
+            title: { type: 'string', description: 'Campaign title' },
+            subject: { type: 'string', description: 'Email subject' },
+            template_id: { type: 'number', description: 'Template ID' },
+            recipient_list: { type: 'array', items: { type: 'number' }, description: 'List IDs' },
           },
           required: ['title', 'subject'],
         },
       },
       {
         name: 'fluentcrm_pause_campaign',
-        description: 'Wstrzymuje kampanię',
+        description: 'Pauses a campaign',
         inputSchema: {
           type: 'object',
           properties: {
-            campaignId: { type: 'number', description: 'ID kampanii' },
+            campaignId: { type: 'number', description: 'Campaign ID' },
           },
           required: ['campaignId'],
         },
       },
       {
         name: 'fluentcrm_resume_campaign',
-        description: 'Wznawia kampanię',
+        description: 'Resumes a paused campaign',
         inputSchema: {
           type: 'object',
           properties: {
-            campaignId: { type: 'number', description: 'ID kampanii' },
+            campaignId: { type: 'number', description: 'Campaign ID' },
           },
           required: ['campaignId'],
         },
       },
       {
         name: 'fluentcrm_delete_campaign',
-        description: 'Usuwa kampanię',
+        description: 'Deletes a campaign',
         inputSchema: {
           type: 'object',
           properties: {
-            campaignId: { type: 'number', description: 'ID kampanii' },
+            campaignId: { type: 'number', description: 'Campaign ID' },
           },
           required: ['campaignId'],
         },
@@ -742,7 +742,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
       // ===== EMAIL TEMPLATES =====
       {
         name: 'fluentcrm_list_email_templates',
-        description: 'Pobiera szablony email',
+        description: 'Retrieves email templates',
         inputSchema: {
           type: 'object',
           properties: {},
@@ -750,22 +750,22 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
       },
       {
         name: 'fluentcrm_create_email_template',
-        description: 'Tworzy nowy szablon email',
+        description: 'Creates a new email template',
         inputSchema: {
           type: 'object',
           properties: {
-            title: { type: 'string', description: 'Nazwa szablonu' },
-            subject: { type: 'string', description: 'Temat' },
-            body: { type: 'string', description: 'Treść HTML' },
+            title: { type: 'string', description: 'Template name' },
+            subject: { type: 'string', description: 'Subject' },
+            body: { type: 'string', description: 'HTML body content' },
           },
           required: ['title', 'subject', 'body'],
         },
       },
 
-      // ===== AUTOMATYZACJE =====
+      // ===== AUTOMATIONS =====
       {
         name: 'fluentcrm_list_automations',
-        description: 'Pobiera automatyzacje (funnels)',
+        description: 'Retrieves automations (funnels)',
         inputSchema: {
           type: 'object',
           properties: {
@@ -776,13 +776,13 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
       },
       {
         name: 'fluentcrm_create_automation',
-        description: 'Tworzy nową automatyzację',
+        description: 'Creates a new automation',
         inputSchema: {
           type: 'object',
           properties: {
-            title: { type: 'string', description: 'Nazwa automatyzacji' },
+            title: { type: 'string', description: 'Automation name' },
             description: { type: 'string' },
-            trigger: { type: 'string', description: 'Typ triggera' },
+            trigger: { type: 'string', description: 'Trigger type' },
           },
           required: ['title', 'trigger'],
         },
@@ -791,7 +791,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
       // ===== WEBHOOKS =====
       {
         name: 'fluentcrm_list_webhooks',
-        description: 'Pobiera webhooks',
+        description: 'Retrieves webhooks',
         inputSchema: {
           type: 'object',
           properties: {},
@@ -799,12 +799,12 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
       },
       {
         name: 'fluentcrm_create_webhook',
-        description: 'Tworzy nowy webhook',
+        description: 'Creates a new webhook',
         inputSchema: {
           type: 'object',
           properties: {
-            name: { type: 'string', description: 'Nazwa webhook' },
-            url: { type: 'string', description: 'URL webhook' },
+            name: { type: 'string', description: 'Webhook name' },
+            url: { type: 'string', description: 'Webhook URL' },
             status: { type: 'string', enum: ['pending', 'subscribed'] },
             tags: { type: 'array', items: { type: 'number' } },
             lists: { type: 'array', items: { type: 'number' } },
@@ -816,51 +816,51 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
       // ===== SMART LINKS =====
       {
         name: 'fluentcrm_list_smart_links',
-        description: 'Pobiera listę Smart Links z FluentCRM (może nie być dostępne w obecnej wersji)',
+        description: 'Retrieves a list of Smart Links from FluentCRM (may not be available in all versions)',
         inputSchema: {
           type: 'object',
           properties: {
-            page: { type: 'number', description: 'Numer strony' },
-            search: { type: 'string', description: 'Szukaj Smart Link' },
+            page: { type: 'number', description: 'Page number' },
+            search: { type: 'string', description: 'Search Smart Links' },
           },
         },
       },
       {
         name: 'fluentcrm_get_smart_link',
-        description: 'Pobiera szczegóły konkretnego Smart Link',
+        description: 'Retrieves details of a specific Smart Link',
         inputSchema: {
           type: 'object',
           properties: {
-            smartLinkId: { type: 'number', description: 'ID Smart Link' },
+            smartLinkId: { type: 'number', description: 'Smart Link ID' },
           },
           required: ['smartLinkId'],
         },
       },
       {
         name: 'fluentcrm_create_smart_link',
-        description: 'Tworzy nowy Smart Link (może nie być dostępne w obecnej wersji)',
+        description: 'Creates a new Smart Link (may not be available in all versions)',
         inputSchema: {
           type: 'object',
           properties: {
-            title: { type: 'string', description: 'Nazwa Smart Link (np. "AW-Link-Webinar-Mail")' },
-            slug: { type: 'string', description: 'Slug (np. "aw-link-webinar-mail")' },
-            target_url: { type: 'string', description: 'Docelowy URL' },
-            apply_tags: { type: 'array', items: { type: 'number' }, description: 'ID tagów do dodania po kliknięciu' },
-            apply_lists: { type: 'array', items: { type: 'number' }, description: 'ID list do dodania po kliknięciu' },
-            remove_tags: { type: 'array', items: { type: 'number' }, description: 'ID tagów do usunięcia po kliknięciu' },
-            remove_lists: { type: 'array', items: { type: 'number' }, description: 'ID list do usunięcia po kliknięciu' },
-            auto_login: { type: 'boolean', description: 'Czy automatycznie logować użytkownika' },
+            title: { type: 'string', description: 'Smart Link name (e.g. "AW-Link-Webinar-Mail")' },
+            slug: { type: 'string', description: 'Slug (e.g. "aw-link-webinar-mail")' },
+            target_url: { type: 'string', description: 'Target URL' },
+            apply_tags: { type: 'array', items: { type: 'number' }, description: 'Tag IDs to apply on click' },
+            apply_lists: { type: 'array', items: { type: 'number' }, description: 'List IDs to apply on click' },
+            remove_tags: { type: 'array', items: { type: 'number' }, description: 'Tag IDs to remove on click' },
+            remove_lists: { type: 'array', items: { type: 'number' }, description: 'List IDs to remove on click' },
+            auto_login: { type: 'boolean', description: 'Automatically log in the user on click' },
           },
           required: ['title', 'target_url'],
         },
       },
       {
         name: 'fluentcrm_update_smart_link',
-        description: 'Aktualizuje Smart Link (może nie być dostępne w obecnej wersji)',
+        description: 'Updates a Smart Link (may not be available in all versions)',
         inputSchema: {
           type: 'object',
           properties: {
-            smartLinkId: { type: 'number', description: 'ID Smart Link' },
+            smartLinkId: { type: 'number', description: 'Smart Link ID' },
             title: { type: 'string' },
             target_url: { type: 'string' },
             apply_tags: { type: 'array', items: { type: 'number' } },
@@ -874,36 +874,36 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
       },
       {
         name: 'fluentcrm_delete_smart_link',
-        description: 'Usuwa Smart Link (może nie być dostępne w obecnej wersji)',
+        description: 'Deletes a Smart Link (may not be available in all versions)',
         inputSchema: {
           type: 'object',
           properties: {
-            smartLinkId: { type: 'number', description: 'ID Smart Link do usunięcia' },
+            smartLinkId: { type: 'number', description: 'ID of the Smart Link to delete' },
           },
           required: ['smartLinkId'],
         },
       },
       {
         name: 'fluentcrm_generate_smart_link_shortcode',
-        description: 'Generuje shortcode dla Smart Link',
+        description: 'Generates a shortcode for a Smart Link',
         inputSchema: {
           type: 'object',
           properties: {
-            slug: { type: 'string', description: 'Slug Smart Link' },
-            linkText: { type: 'string', description: 'Tekst linku (opcjonalny)' },
+            slug: { type: 'string', description: 'Smart Link slug' },
+            linkText: { type: 'string', description: 'Link text (optional)' },
           },
           required: ['slug'],
         },
       },
       {
         name: 'fluentcrm_validate_smart_link_data',
-        description: 'Waliduje dane Smart Link przed utworzeniem',
+        description: 'Validates Smart Link data before creation',
         inputSchema: {
           type: 'object',
           properties: {
-            title: { type: 'string', description: 'Nazwa Smart Link' },
+            title: { type: 'string', description: 'Smart Link name' },
             slug: { type: 'string', description: 'Slug' },
-            target_url: { type: 'string', description: 'Docelowy URL' },
+            target_url: { type: 'string', description: 'Target URL' },
             apply_tags: { type: 'array', items: { type: 'number' } },
             apply_lists: { type: 'array', items: { type: 'number' } },
             remove_tags: { type: 'array', items: { type: 'number' } },
@@ -914,10 +914,10 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
         },
       },
 
-      // ===== RAPORTY =====
+      // ===== REPORTS =====
       {
         name: 'fluentcrm_dashboard_stats',
-        description: 'Pobiera statystyki dashboarda',
+        description: 'Retrieves dashboard statistics',
         inputSchema: {
           type: 'object',
           properties: {},
@@ -925,7 +925,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
       },
       {
         name: 'fluentcrm_custom_fields',
-        description: 'Pobiera pola niestandardowe',
+        description: 'Retrieves custom fields',
         inputSchema: {
           type: 'object',
           properties: {},
