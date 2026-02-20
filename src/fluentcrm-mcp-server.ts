@@ -46,10 +46,8 @@ class FluentCRMClient {
     this.apiClient.interceptors.response.use(
       response => response,
       error => {
-        const data = error.response?.data;
-        const message = data?.message || error.message;
-        const errors = data?.errors ? ` Validation errors: ${JSON.stringify(data.errors)}` : '';
-        throw new Error(`FluentCRM API Error: ${message}${errors}`);
+        const message = error.response?.data?.message || error.message;
+        throw new Error(`FluentCRM API Error: ${message}`);
       }
     );
   }
