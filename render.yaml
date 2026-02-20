@@ -7,7 +7,7 @@ services:
     healthCheckPath: /health
     envVars:
       - key: FLUENTCRM_API_URL
-        sync: false         # set manually in Render dashboard
+        sync: false # set manually in Render dashboard
       - key: FLUENTCRM_API_USERNAME
         sync: false
       - key: FLUENTCRM_API_PASSWORD
