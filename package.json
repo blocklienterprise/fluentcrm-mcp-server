@@ -10,7 +10,7 @@
   "scripts": {
     "build": "tsc && chmod +x dist/fluentcrm-mcp-server.js",
     "dev": "tsc --watch",
-    "start": "FLUENTCRM_API_USERNAME='$FLUENTCRM_API_USERNAME' FLUENTCRM_API_PASSWORD='$FLUENTCRM_API_PASSWORD' node dist/fluentcrm-mcp-server.js",
+    "start": "node dist/fluentcrm-mcp-server.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [

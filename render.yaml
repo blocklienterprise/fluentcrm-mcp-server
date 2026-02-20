@@ -1,0 +1,16 @@
+services:
+  - type: web
+    name: fluentcrm-mcp-server
+    runtime: node
+    buildCommand: npm install && npm run build
+    startCommand: node dist/fluentcrm-mcp-server.js
+    healthCheckPath: /health
+    envVars:
+      - key: FLUENTCRM_API_URL
+        sync: false         # set manually in Render dashboard
+      - key: FLUENTCRM_API_USERNAME
+        sync: false
+      - key: FLUENTCRM_API_PASSWORD
+        sync: false
+      - key: MCP_AUTH_TOKEN
+        generateValue: true # Render auto-generates a secure random value
