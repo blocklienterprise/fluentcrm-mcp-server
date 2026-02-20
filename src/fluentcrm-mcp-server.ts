@@ -466,6 +466,7 @@ class FluentCRMClient {
 
 // ===== MCP SERVER SETUP =====
 
+function createMcpServer(client: FluentCRMClient): Server {
 const server = new Server(
   {
     name: 'fluentcrm-mcp',
@@ -476,12 +477,6 @@ const server = new Server(
       tools: {},
     },
   }
-);
-
-const client = new FluentCRMClient(
-  FLUENTCRM_API_URL,
-  FLUENTCRM_API_USERNAME,
-  FLUENTCRM_API_PASSWORD
 );
 
 server.setRequestHandler(ListToolsRequestSchema, async () => {
@@ -1031,6 +1026,9 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
   }
 });
 
+return server;
+}
+
 // ─── HTTP transport (used on Render / any cloud host) ───────────────────────
 async function startHTTP(port: number): Promise<void> {
   const transports = new Map<string, StreamableHTTPServerTransport>();
@@ -1083,7 +1081,12 @@ async function startHTTP(port: number): Promise<void> {
         transport.onclose = () => {
           if (transport.sessionId) transports.delete(transport.sessionId);
         };
-        await server.connect(transport);
+        const fcrmUrl  = (req.headers['x-fluentcrm-url']      as string) || FLUENTCRM_API_URL;
+        const fcrmUser = (req.headers['x-fluentcrm-username'] as string) || FLUENTCRM_API_USERNAME;
+        const fcrmPass = (req.headers['x-fluentcrm-password'] as string) || FLUENTCRM_API_PASSWORD;
+        const sessionClient = new FluentCRMClient(fcrmUrl, fcrmUser, fcrmPass);
+        const sessionServer = createMcpServer(sessionClient);
+        await sessionServer.connect(transport);
       }
 
       const rawBody = await readBody(req);
@@ -1128,8 +1131,10 @@ async function main() {
   if (process.env.PORT) {
     await startHTTP(parseInt(process.env.PORT, 10));
   } else {
+    const stdioClient = new FluentCRMClient(FLUENTCRM_API_URL, FLUENTCRM_API_USERNAME, FLUENTCRM_API_PASSWORD);
+    const stdioServer = createMcpServer(stdioClient);
     const transport = new StdioServerTransport();
-    await server.connect(transport);
+    await stdioServer.connect(transport);
     console.error('🚀 FluentCRM MCP Server running on stdio');
     console.error(`📡 API URL: ${FLUENTCRM_API_URL}`);
     console.error(`👤 Username: ${FLUENTCRM_API_USERNAME}`);
