@@ -1124,6 +1124,23 @@ async function startHTTP(port: number): Promise<void> {
     console.error(`📡 FluentCRM API: ${FLUENTCRM_API_URL}`);
     if (AUTH_TOKEN) console.error('🔒 Bearer auth enabled (MCP_AUTH_TOKEN is set)');
     else console.error('⚠️  No MCP_AUTH_TOKEN set — endpoint is open');
+
+    // ── Keep-alive ping (prevents Render free-tier cold starts) ──────────────
+    // Render spins down after 15 min of inactivity. We self-ping every 14 min.
+    // RENDER_EXTERNAL_URL is set automatically by Render.
+    const renderUrl = process.env.RENDER_EXTERNAL_URL;
+    if (renderUrl) {
+      const PING_INTERVAL_MS = 14 * 60 * 1000; // 14 minutes
+      setInterval(async () => {
+        try {
+          const res = await fetch(`${renderUrl}/health`);
+          console.error(`🏓 Keep-alive ping → ${res.status}`);
+        } catch (err: any) {
+          console.error(`⚠️  Keep-alive ping failed: ${err.message}`);
+        }
+      }, PING_INTERVAL_MS);
+      console.error(`🏓 Keep-alive enabled — pinging ${renderUrl}/health every 14 min`);
+    }
   });
 }
 
