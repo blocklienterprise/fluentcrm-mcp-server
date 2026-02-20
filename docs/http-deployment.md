@@ -2,30 +2,30 @@
 
 The server supports two transport modes that are selected automatically at startup.
 
-| Mode | When | Use case |
-|------|------|----------|
-| **STDIO** | `PORT` env var is **not** set | Local dev, Claude Desktop, npx |
-| **HTTP (Streamable)** | `PORT` env var is set | Render, Railway, Fly.io, any cloud |
+| Mode                  | When                          | Use case                           |
+| --------------------- | ----------------------------- | ---------------------------------- |
+| **STDIO**             | `PORT` env var is **not** set | Local dev, Claude Desktop, npx     |
+| **HTTP (Streamable)** | `PORT` env var is set         | Render, Railway, Fly.io, any cloud |
 
 ## HTTP Endpoints
 
-| Path | Method(s) | Purpose |
-|------|-----------|---------|
-| `/mcp` | `POST`, `GET`, `DELETE` | MCP protocol (Streamable HTTP transport) |
-| `/health` | `GET` | Health check — returns `{"status":"ok"}` |
+| Path      | Method(s)               | Purpose                                  |
+| --------- | ----------------------- | ---------------------------------------- |
+| `/mcp`    | `POST`, `GET`, `DELETE` | MCP protocol (Streamable HTTP transport) |
+| `/health` | `GET`                   | Health check — returns `{"status":"ok"}` |
 
 ## Environment Variables
 
-| Variable | Required | Description |
-|----------|----------|-------------|
-| `PORT` | Yes (cloud) | Port to listen on — set automatically by most platforms |
-| `FLUENTCRM_API_URL` | Yes* | Default FluentCRM REST API base URL |
-| `FLUENTCRM_API_USERNAME` | Yes* | Default WordPress username |
-| `FLUENTCRM_API_PASSWORD` | Yes* | WordPress Application Password |
-| `MCP_AUTH_TOKEN` | Recommended | Bearer token required on every request to `/mcp` |
-| `MCP_LANG` | No | Tool description language (`en` default, `pl` available) |
+| Variable                 | Required    | Description                                              |
+| ------------------------ | ----------- | -------------------------------------------------------- |
+| `PORT`                   | Yes (cloud) | Port to listen on — set automatically by most platforms  |
+| `FLUENTCRM_API_URL`      | Yes\*       | Default FluentCRM REST API base URL                      |
+| `FLUENTCRM_API_USERNAME` | Yes\*       | Default WordPress username                               |
+| `FLUENTCRM_API_PASSWORD` | Yes\*       | WordPress Application Password                           |
+| `MCP_AUTH_TOKEN`         | Recommended | Bearer token required on every request to `/mcp`         |
+| `MCP_LANG`               | No          | Tool description language (`en` default, `pl` available) |
 
-*Required only when not supplying per-connection headers (see Multi-site below).
+\*Required only when not supplying per-connection headers (see Multi-site below).
 
 ## Deploy to Render
 
@@ -34,7 +34,7 @@ The server supports two transport modes that are selected automatically at start
 The repo ships a `render.yaml`. Connect your GitHub repo to Render and it will auto-configure the service.
 
 1. Go to [render.com](https://render.com) → **New** → **Web Service**
-2. Connect the `blocklienterprise/fluentcrm-mcp-server` repo
+2. Connect your GitHub repo
 3. Render detects `render.yaml` and pre-fills all settings
 4. Set the secret env vars in the dashboard (marked `sync: false` in `render.yaml`):
    - `FLUENTCRM_API_URL`
@@ -44,12 +44,12 @@ The repo ships a `render.yaml`. Connect your GitHub repo to Render and it will a
 
 ### Option B — manual
 
-| Setting | Value |
-|---------|-------|
-| Runtime | Node |
-| Build command | `npm install && npm run build` |
-| Start command | `node dist/fluentcrm-mcp-server.js` |
-| Health check path | `/health` |
+| Setting           | Value                               |
+| ----------------- | ----------------------------------- |
+| Runtime           | Node                                |
+| Build command     | `npm install && npm run build`      |
+| Start command     | `node dist/fluentcrm-mcp-server.js` |
+| Health check path | `/health`                           |
 
 ## Authentication
 
@@ -70,9 +70,9 @@ A single deployed instance can serve multiple WordPress sites. Each MCP client c
 
 ### Per-connection headers
 
-| Header | Fallback |
-|--------|----------|
-| `X-FluentCRM-Url` | `FLUENTCRM_API_URL` env var |
+| Header                 | Fallback                         |
+| ---------------------- | -------------------------------- |
+| `X-FluentCRM-Url`      | `FLUENTCRM_API_URL` env var      |
 | `X-FluentCRM-Username` | `FLUENTCRM_API_USERNAME` env var |
 | `X-FluentCRM-Password` | `FLUENTCRM_API_PASSWORD` env var |
 
@@ -157,6 +157,7 @@ PORT=3000 MCP_AUTH_TOKEN=test123 node dist/fluentcrm-mcp-server.js
 ```
 
 Health check:
+
 ```bash
 curl http://localhost:3000/health
 # {"status":"ok","server":"fluentcrm-mcp"}
