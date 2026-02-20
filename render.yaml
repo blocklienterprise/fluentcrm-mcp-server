@@ -14,3 +14,5 @@ services:
         sync: false
       - key: MCP_AUTH_TOKEN
         generateValue: true # Render auto-generates a secure random value
+      - key: MCP_LANG
+        value: en # Supported: en, pl
