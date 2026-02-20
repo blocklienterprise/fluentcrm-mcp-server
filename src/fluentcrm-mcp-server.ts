@@ -40,7 +40,7 @@ class FluentCRMClient {
         'Content-Type': 'application/json',
         'Accept': 'application/json',
       },
-      timeout: 30000,
+      timeout: 180000, // 3 minutes — accommodates Render cold-start + API latency
     });
 
     // Error interceptor
