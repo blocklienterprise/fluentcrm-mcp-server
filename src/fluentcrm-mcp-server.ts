@@ -48,9 +48,12 @@ class FluentCRMClient {
       response => response,
       error => {
         const data = error.response?.data;
+        console.error('[FluentCRM] API error response body:', JSON.stringify(data));
         const message = data?.message || error.message;
-        const errors = data?.errors ? ` Validation errors: ${JSON.stringify(data.errors)}` : '';
-        throw new Error(`FluentCRM API Error: ${message}${errors}`);
+        const detail = data && Object.keys(data).length > 0
+          ? ` Full response: ${JSON.stringify(data)}`
+          : '';
+        throw new Error(`FluentCRM API Error: ${message}${detail}`);
       }
     );
   }
