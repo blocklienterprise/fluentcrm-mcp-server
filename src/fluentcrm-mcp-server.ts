@@ -324,8 +324,8 @@ class FluentCRMClient {
     return response.data;
   }
 
-  async addFunnelSubscribers(funnelId: number, subscribers: number[]) {
-    const response = await this.apiClient.post(`/funnels/${funnelId}/subscribers`, { subscribers });
+  async updateFunnelSubscriberStatus(funnelId: number, subscriberId: number, status: string) {
+    const response = await this.apiClient.put(`/funnels/${funnelId}/subscribers/${subscriberId}/status`, { status });
     return response.data;
   }
 
@@ -878,15 +878,16 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
         },
       },
       {
-        name: 'fluentcrm_add_funnel_subscriber',
-        description: t('fluentcrm_add_funnel_subscriber'),
+        name: 'fluentcrm_update_funnel_subscriber_status',
+        description: t('fluentcrm_update_funnel_subscriber_status'),
         inputSchema: {
           type: 'object',
           properties: {
-            funnelId: { type: 'number', description: t('fluentcrm_add_funnel_subscriber', 'funnelId') },
-            subscribers: { type: 'array', items: { type: 'number' }, description: t('fluentcrm_add_funnel_subscriber', 'subscribers') },
+            funnelId: { type: 'number', description: t('fluentcrm_update_funnel_subscriber_status', 'funnelId') },
+            subscriberId: { type: 'number', description: t('fluentcrm_update_funnel_subscriber_status', 'subscriberId') },
+            status: { type: 'string', description: t('fluentcrm_update_funnel_subscriber_status', 'status') },
           },
-          required: ['funnelId', 'subscribers'],
+          required: ['funnelId', 'subscriberId', 'status'],
         },
       },
       {
@@ -1120,8 +1121,8 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         return { content: [{ type: 'text', text: JSON.stringify(await client.deleteAutomation((args as any)?.funnelId), null, 2) }] };
       case 'fluentcrm_get_funnel_subscribers':
         return { content: [{ type: 'text', text: JSON.stringify(await client.getFunnelSubscribers((args as any)?.funnelId, args || {}), null, 2) }] };
-      case 'fluentcrm_add_funnel_subscriber':
-        return { content: [{ type: 'text', text: JSON.stringify(await client.addFunnelSubscribers((args as any)?.funnelId, (args as any)?.subscribers), null, 2) }] };
+      case 'fluentcrm_update_funnel_subscriber_status':
+        return { content: [{ type: 'text', text: JSON.stringify(await client.updateFunnelSubscriberStatus((args as any)?.funnelId, (args as any)?.subscriberId, (args as any)?.status), null, 2) }] };
       case 'fluentcrm_remove_funnel_subscriber':
         return { content: [{ type: 'text', text: JSON.stringify(await client.removeFunnelSubscribers((args as any)?.funnelId, (args as any)?.subscriber_ids), null, 2) }] };
       case 'fluentcrm_get_funnel_report':

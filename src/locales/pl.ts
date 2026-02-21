@@ -140,9 +140,9 @@ export const locale: Locale = {
       description: 'Pobiera subskrybentów zapisanych do funnela',
       params: { funnelId: 'ID funnela', status: 'Filtruj po statusie: active, completed lub cancelled' },
     },
-    fluentcrm_add_funnel_subscriber: {
-      description: 'Dodaje jeden lub więcej kontaktów do funnela',
-      params: { funnelId: 'ID funnela', subscribers: 'Tablica ID kontaktów do dodania' },
+    fluentcrm_update_funnel_subscriber_status: {
+      description: 'Aktualizuje status kontaktu zapisanego w lejku (np. active, paused, cancelled)',
+      params: { funnelId: 'ID lejka', subscriberId: 'ID subskrybenta (kontaktu)', status: 'Nowy status: active, paused lub cancelled' },
     },
     fluentcrm_remove_funnel_subscriber: {
       description: 'Usuwa jeden lub więcej kontaktów z funnela',

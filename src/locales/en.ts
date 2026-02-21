@@ -140,9 +140,9 @@ export const locale: Locale = {
       description: 'Retrieves subscribers enrolled in a funnel',
       params: { funnelId: 'Funnel ID', status: 'Filter by status: active, completed, or cancelled' },
     },
-    fluentcrm_add_funnel_subscriber: {
-      description: 'Adds one or more contacts to a funnel',
-      params: { funnelId: 'Funnel ID', subscribers: 'Array of contact IDs to add' },
+    fluentcrm_update_funnel_subscriber_status: {
+      description: 'Updates the status of a contact already enrolled in a funnel (e.g. active, paused, cancelled)',
+      params: { funnelId: 'Funnel ID', subscriberId: 'Subscriber (contact) ID', status: 'New status: active, paused, or cancelled' },
     },
     fluentcrm_remove_funnel_subscriber: {
       description: 'Removes one or more contacts from a funnel',
