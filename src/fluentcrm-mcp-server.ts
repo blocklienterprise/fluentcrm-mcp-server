@@ -239,27 +239,46 @@ class FluentCRMClient {
   // ===== EMAIL TEMPLATES =====
 
   async listEmailTemplates(params: any = {}) {
-    const response = await this.apiClient.get('/email-templates', { params });
+    const response = await this.apiClient.get('/templates', { params });
     return response.data;
   }
 
   async getEmailTemplate(templateId: number) {
-    const response = await this.apiClient.get(`/email-templates/${templateId}`);
+    const response = await this.apiClient.get(`/templates/${templateId}`);
     return response.data;
   }
 
   async createEmailTemplate(data: any) {
-    const response = await this.apiClient.post('/email-templates', data);
+    // FluentCRM API expects: { template: { post_title, post_content, email_subject, edit_type, design_template } }
+    const payload = {
+      template: {
+        post_title: data.title || data.post_title || '',
+        post_content: data.body || data.post_content || '',
+        email_subject: data.subject || data.email_subject || '',
+        edit_type: data.edit_type || 'html',
+        design_template: data.design_template || 'raw_html',
+      },
+    };
+    const response = await this.apiClient.post('/templates', payload);
     return response.data;
   }
 
   async updateEmailTemplate(templateId: number, data: any) {
-    const response = await this.apiClient.put(`/email-templates/${templateId}`, data);
+    const payload = data.template ? data : {
+      template: {
+        post_title: data.title || data.post_title,
+        post_content: data.body || data.post_content,
+        email_subject: data.subject || data.email_subject,
+        edit_type: data.edit_type || 'html',
+        design_template: data.design_template || 'raw_html',
+      },
+    };
+    const response = await this.apiClient.put(`/templates/${templateId}`, payload);
     return response.data;
   }
 
   async deleteEmailTemplate(templateId: number) {
-    const response = await this.apiClient.delete(`/email-templates/${templateId}`);
+    const response = await this.apiClient.delete(`/templates/${templateId}`);
     return response.data;
   }
 
