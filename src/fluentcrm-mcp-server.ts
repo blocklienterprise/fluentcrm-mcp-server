@@ -315,7 +315,7 @@ class FluentCRMClient {
   }
 
   async duplicateFunnel(funnelId: number) {
-    const response = await this.apiClient.post(`/funnels/${funnelId}/duplicate`);
+    const response = await this.apiClient.post(`/funnels/${funnelId}/clone`);
     return response.data;
   }
 
@@ -329,8 +329,8 @@ class FluentCRMClient {
     return response.data;
   }
 
-  async removeFunnelSubscriber(funnelId: number, subscriberId: number) {
-    const response = await this.apiClient.delete(`/funnels/${funnelId}/subscribers/${subscriberId}`);
+  async removeFunnelSubscribers(funnelId: number, subscriberIds: number[]) {
+    const response = await this.apiClient.delete(`/funnels/${funnelId}/subscribers`, { data: { subscriber_ids: subscriberIds } });
     return response.data;
   }
 
@@ -896,9 +896,9 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
           type: 'object',
           properties: {
             funnelId: { type: 'number', description: t('fluentcrm_remove_funnel_subscriber', 'funnelId') },
-            subscriberId: { type: 'number', description: t('fluentcrm_remove_funnel_subscriber', 'subscriberId') },
+            subscriber_ids: { type: 'array', items: { type: 'number' }, description: t('fluentcrm_remove_funnel_subscriber', 'subscriber_ids') },
           },
-          required: ['funnelId', 'subscriberId'],
+          required: ['funnelId', 'subscriber_ids'],
         },
       },
       {
@@ -1123,7 +1123,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       case 'fluentcrm_add_funnel_subscriber':
         return { content: [{ type: 'text', text: JSON.stringify(await client.addFunnelSubscribers((args as any)?.funnelId, (args as any)?.subscribers), null, 2) }] };
       case 'fluentcrm_remove_funnel_subscriber':
-        return { content: [{ type: 'text', text: JSON.stringify(await client.removeFunnelSubscriber((args as any)?.funnelId, (args as any)?.subscriberId), null, 2) }] };
+        return { content: [{ type: 'text', text: JSON.stringify(await client.removeFunnelSubscribers((args as any)?.funnelId, (args as any)?.subscriber_ids), null, 2) }] };
       case 'fluentcrm_get_funnel_report':
         return { content: [{ type: 'text', text: JSON.stringify(await client.getFunnelReport((args as any)?.funnelId), null, 2) }] };
       case 'fluentcrm_list_webhooks':

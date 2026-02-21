@@ -145,8 +145,8 @@ export const locale: Locale = {
       params: { funnelId: 'ID funnela', subscribers: 'Tablica ID kontaktów do dodania' },
     },
     fluentcrm_remove_funnel_subscriber: {
-      description: 'Usuwa kontakt z funnela',
-      params: { funnelId: 'ID funnela', subscriberId: 'ID subskrybenta do usunięcia' },
+      description: 'Usuwa jeden lub więcej kontaktów z funnela',
+      params: { funnelId: 'ID funnela', subscriber_ids: 'Tablica ID subskrybentów do usunięcia' },
     },
     fluentcrm_get_funnel_report: {
       description: 'Pobiera raport wydajności funnela',
