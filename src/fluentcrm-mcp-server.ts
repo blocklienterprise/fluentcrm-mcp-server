@@ -309,6 +309,41 @@ class FluentCRMClient {
     return response.data;
   }
 
+  async updateFunnelStatus(funnelId: number, status: string) {
+    const response = await this.apiClient.put(`/funnels/${funnelId}/status`, { status });
+    return response.data;
+  }
+
+  async duplicateFunnel(funnelId: number) {
+    const response = await this.apiClient.post(`/funnels/${funnelId}/duplicate`);
+    return response.data;
+  }
+
+  async getFunnelSubscribers(funnelId: number, params: any = {}) {
+    const response = await this.apiClient.get(`/funnels/${funnelId}/subscribers`, { params });
+    return response.data;
+  }
+
+  async addFunnelSubscribers(funnelId: number, subscribers: number[]) {
+    const response = await this.apiClient.post(`/funnels/${funnelId}/subscribers`, { subscribers });
+    return response.data;
+  }
+
+  async removeFunnelSubscriber(funnelId: number, subscriberId: number) {
+    const response = await this.apiClient.delete(`/funnels/${funnelId}/subscribers/${subscriberId}`);
+    return response.data;
+  }
+
+  async getFunnelSequences(funnelId: number) {
+    const response = await this.apiClient.get(`/funnels/${funnelId}/sequences`);
+    return response.data;
+  }
+
+  async getFunnelReport(funnelId: number) {
+    const response = await this.apiClient.get(`/funnels/${funnelId}/report`);
+    return response.data;
+  }
+
   // ===== WEBHOOKS =====
 
   async listWebhooks(params: any = {}) {
@@ -785,7 +820,112 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
           properties: {
             page: { type: 'number' },
             search: { type: 'string' },
+            status: { type: 'string', enum: ['published', 'draft', 'paused'] },
           },
+        },
+      },
+      {
+        name: 'fluentcrm_get_automation',
+        description: t('fluentcrm_get_automation'),
+        inputSchema: {
+          type: 'object',
+          properties: {
+            funnelId: { type: 'number', description: t('fluentcrm_get_automation', 'funnelId') },
+          },
+          required: ['funnelId'],
+        },
+      },
+      {
+        name: 'fluentcrm_update_funnel_status',
+        description: t('fluentcrm_update_funnel_status'),
+        inputSchema: {
+          type: 'object',
+          properties: {
+            funnelId: { type: 'number', description: t('fluentcrm_update_funnel_status', 'funnelId') },
+            status: { type: 'string', enum: ['published', 'draft', 'paused'], description: t('fluentcrm_update_funnel_status', 'status') },
+          },
+          required: ['funnelId', 'status'],
+        },
+      },
+      {
+        name: 'fluentcrm_duplicate_funnel',
+        description: t('fluentcrm_duplicate_funnel'),
+        inputSchema: {
+          type: 'object',
+          properties: {
+            funnelId: { type: 'number', description: t('fluentcrm_duplicate_funnel', 'funnelId') },
+          },
+          required: ['funnelId'],
+        },
+      },
+      {
+        name: 'fluentcrm_delete_automation',
+        description: t('fluentcrm_delete_automation'),
+        inputSchema: {
+          type: 'object',
+          properties: {
+            funnelId: { type: 'number', description: t('fluentcrm_delete_automation', 'funnelId') },
+          },
+          required: ['funnelId'],
+        },
+      },
+      {
+        name: 'fluentcrm_get_funnel_subscribers',
+        description: t('fluentcrm_get_funnel_subscribers'),
+        inputSchema: {
+          type: 'object',
+          properties: {
+            funnelId: { type: 'number', description: t('fluentcrm_get_funnel_subscribers', 'funnelId') },
+            status: { type: 'string', enum: ['active', 'completed', 'cancelled'] },
+            page: { type: 'number' },
+          },
+          required: ['funnelId'],
+        },
+      },
+      {
+        name: 'fluentcrm_add_funnel_subscriber',
+        description: t('fluentcrm_add_funnel_subscriber'),
+        inputSchema: {
+          type: 'object',
+          properties: {
+            funnelId: { type: 'number', description: t('fluentcrm_add_funnel_subscriber', 'funnelId') },
+            subscribers: { type: 'array', items: { type: 'number' }, description: t('fluentcrm_add_funnel_subscriber', 'subscribers') },
+          },
+          required: ['funnelId', 'subscribers'],
+        },
+      },
+      {
+        name: 'fluentcrm_remove_funnel_subscriber',
+        description: t('fluentcrm_remove_funnel_subscriber'),
+        inputSchema: {
+          type: 'object',
+          properties: {
+            funnelId: { type: 'number', description: t('fluentcrm_remove_funnel_subscriber', 'funnelId') },
+            subscriberId: { type: 'number', description: t('fluentcrm_remove_funnel_subscriber', 'subscriberId') },
+          },
+          required: ['funnelId', 'subscriberId'],
+        },
+      },
+      {
+        name: 'fluentcrm_get_funnel_sequences',
+        description: t('fluentcrm_get_funnel_sequences'),
+        inputSchema: {
+          type: 'object',
+          properties: {
+            funnelId: { type: 'number', description: t('fluentcrm_get_funnel_sequences', 'funnelId') },
+          },
+          required: ['funnelId'],
+        },
+      },
+      {
+        name: 'fluentcrm_get_funnel_report',
+        description: t('fluentcrm_get_funnel_report'),
+        inputSchema: {
+          type: 'object',
+          properties: {
+            funnelId: { type: 'number', description: t('fluentcrm_get_funnel_report', 'funnelId') },
+          },
+          required: ['funnelId'],
         },
       },
       // ===== WEBHOOKS =====
@@ -986,6 +1126,24 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         return { content: [{ type: 'text', text: JSON.stringify(await client.createEmailTemplate(args as any), null, 2) }] };
       case 'fluentcrm_list_automations':
         return { content: [{ type: 'text', text: JSON.stringify(await client.listAutomations(args || {}), null, 2) }] };
+      case 'fluentcrm_get_automation':
+        return { content: [{ type: 'text', text: JSON.stringify(await client.getAutomation((args as any)?.funnelId), null, 2) }] };
+      case 'fluentcrm_update_funnel_status':
+        return { content: [{ type: 'text', text: JSON.stringify(await client.updateFunnelStatus((args as any)?.funnelId, (args as any)?.status), null, 2) }] };
+      case 'fluentcrm_duplicate_funnel':
+        return { content: [{ type: 'text', text: JSON.stringify(await client.duplicateFunnel((args as any)?.funnelId), null, 2) }] };
+      case 'fluentcrm_delete_automation':
+        return { content: [{ type: 'text', text: JSON.stringify(await client.deleteAutomation((args as any)?.funnelId), null, 2) }] };
+      case 'fluentcrm_get_funnel_subscribers':
+        return { content: [{ type: 'text', text: JSON.stringify(await client.getFunnelSubscribers((args as any)?.funnelId, args || {}), null, 2) }] };
+      case 'fluentcrm_add_funnel_subscriber':
+        return { content: [{ type: 'text', text: JSON.stringify(await client.addFunnelSubscribers((args as any)?.funnelId, (args as any)?.subscribers), null, 2) }] };
+      case 'fluentcrm_remove_funnel_subscriber':
+        return { content: [{ type: 'text', text: JSON.stringify(await client.removeFunnelSubscriber((args as any)?.funnelId, (args as any)?.subscriberId), null, 2) }] };
+      case 'fluentcrm_get_funnel_sequences':
+        return { content: [{ type: 'text', text: JSON.stringify(await client.getFunnelSequences((args as any)?.funnelId), null, 2) }] };
+      case 'fluentcrm_get_funnel_report':
+        return { content: [{ type: 'text', text: JSON.stringify(await client.getFunnelReport((args as any)?.funnelId), null, 2) }] };
       case 'fluentcrm_list_webhooks':
         return { content: [{ type: 'text', text: JSON.stringify(await client.listWebhooks(), null, 2) }] };
       case 'fluentcrm_create_webhook':

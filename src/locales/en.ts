@@ -120,9 +120,41 @@ export const locale: Locale = {
 
     // AUTOMATIONS
     fluentcrm_list_automations: { description: 'Retrieves automations (funnels)' },
-    fluentcrm_create_automation: {
-      description: 'Creates a new automation',
-      params: { title: 'Automation name', trigger: 'Trigger type' },
+    fluentcrm_get_automation: {
+      description: 'Retrieves a specific automation funnel by ID',
+      params: { funnelId: 'Funnel ID' },
+    },
+    fluentcrm_update_funnel_status: {
+      description: 'Updates the status of a funnel (published, draft, or paused)',
+      params: { funnelId: 'Funnel ID', status: 'New status: published, draft, or paused' },
+    },
+    fluentcrm_duplicate_funnel: {
+      description: 'Creates a copy of an existing funnel',
+      params: { funnelId: 'Funnel ID to duplicate' },
+    },
+    fluentcrm_delete_automation: {
+      description: 'Deletes a funnel and stops all active sequences',
+      params: { funnelId: 'Funnel ID to delete' },
+    },
+    fluentcrm_get_funnel_subscribers: {
+      description: 'Retrieves subscribers enrolled in a funnel',
+      params: { funnelId: 'Funnel ID', status: 'Filter by status: active, completed, or cancelled' },
+    },
+    fluentcrm_add_funnel_subscriber: {
+      description: 'Adds one or more contacts to a funnel',
+      params: { funnelId: 'Funnel ID', subscribers: 'Array of contact IDs to add' },
+    },
+    fluentcrm_remove_funnel_subscriber: {
+      description: 'Removes a contact from a funnel',
+      params: { funnelId: 'Funnel ID', subscriberId: 'Subscriber (contact) ID to remove' },
+    },
+    fluentcrm_get_funnel_sequences: {
+      description: 'Retrieves all email sequences in a funnel',
+      params: { funnelId: 'Funnel ID' },
+    },
+    fluentcrm_get_funnel_report: {
+      description: 'Retrieves performance report for a funnel',
+      params: { funnelId: 'Funnel ID' },
     },
 
     // WEBHOOKS
