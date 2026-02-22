@@ -295,9 +295,10 @@ class FluentCRMClient {
       draftRecipientsPayload = { sending_filter: 'advanced_filters', advanced_filters: data.advanced_filters };
     } else if (contactIds.length > 0 || contactEmails.length > 0) {
       // advanced_filters mode — built from contact_ids / contact_emails
+      // FluentCRM's ContactsQuery.formatAdvancedFilters() requires source:[provider, property]
       const filterGroups: any[][] = [];
-      if (contactIds.length > 0)    filterGroups.push([{ property: 'id',    operator: 'in', value: contactIds }]);
-      if (contactEmails.length > 0) filterGroups.push([{ property: 'email', operator: 'in', value: contactEmails }]);
+      if (contactIds.length > 0)    filterGroups.push([{ source: ['subscriber', 'id'],    operator: 'in', value: contactIds }]);
+      if (contactEmails.length > 0) filterGroups.push([{ source: ['subscriber', 'email'], operator: 'in', value: contactEmails }]);
       draftRecipientsPayload = { sending_filter: 'advanced_filters', advanced_filters: filterGroups };
     } else if (data.dynamic_segment_slug && data.dynamic_segment_id) {
       // Dynamic segment targeting (e.g. slug:'tag', id:3  or  slug:'woo_customer', id:X)
@@ -423,7 +424,7 @@ class FluentCRMClient {
     // This is the correct FluentCRM API pattern — PUT /campaigns/{id} ignores recipient settings.
     const response = await this.apiClient.post(`/campaigns/${campaignId}/draft-recipients`, {
       sending_filter: 'advanced_filters',
-      advanced_filters: [[{ property: 'id', operator: 'in', value: contactIds }]],
+      advanced_filters: [[{ source: ['subscriber', 'id'], operator: 'in', value: contactIds }]],
     });
     return response.data;
   }
