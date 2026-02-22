@@ -348,6 +348,13 @@ class FluentCRMClient {
     return response.data;
   }
 
+  async getFunnelSequences(funnelId: number) {
+    const response = await this.apiClient.get(`/funnels/${funnelId}`, {
+      params: { 'with[]': 'funnel_sequences' },
+    });
+    return response.data?.funnel?.funnel_sequences ?? [];
+  }
+
   // ===== WEBHOOKS =====
 
   async listWebhooks(params: any = {}) {
@@ -934,6 +941,17 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
           required: ['funnelId'],
         },
       },
+      {
+        name: 'fluentcrm_get_funnel_sequences',
+        description: t('fluentcrm_get_funnel_sequences'),
+        inputSchema: {
+          type: 'object',
+          properties: {
+            funnelId: { type: 'number', description: t('fluentcrm_get_funnel_sequences', 'funnelId') },
+          },
+          required: ['funnelId'],
+        },
+      },
       // ===== WEBHOOKS =====
       {
         name: 'fluentcrm_list_webhooks',
@@ -1150,6 +1168,8 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         return { content: [{ type: 'text', text: JSON.stringify(await client.addSubscribersToFunnel((args as any)?.funnelId, (args as any)?.subscriber_ids), null, 2) }] };
       case 'fluentcrm_get_funnel_report':
         return { content: [{ type: 'text', text: JSON.stringify(await client.getFunnelReport((args as any)?.funnelId), null, 2) }] };
+      case 'fluentcrm_get_funnel_sequences':
+        return { content: [{ type: 'text', text: JSON.stringify(await client.getFunnelSequences((args as any)?.funnelId), null, 2) }] };
       case 'fluentcrm_list_webhooks':
         return { content: [{ type: 'text', text: JSON.stringify(await client.listWebhooks(), null, 2) }] };
       case 'fluentcrm_create_webhook':

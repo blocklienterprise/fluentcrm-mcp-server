@@ -156,6 +156,10 @@ export const locale: Locale = {
       description: 'Retrieves performance report for a funnel',
       params: { funnelId: 'Funnel ID' },
     },
+    fluentcrm_get_funnel_sequences: {
+      description: 'Retrieves all steps (sequences/actions) in a funnel automation. Returns each step with its type, action name, settings, and any conditional branches.',
+      params: { funnelId: 'Funnel ID' },
+    },
 
     // WEBHOOKS
     fluentcrm_list_webhooks: { description: 'Retrieves webhooks' },

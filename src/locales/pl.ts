@@ -156,6 +156,10 @@ export const locale: Locale = {
       description: 'Pobiera raport wydajności funnela',
       params: { funnelId: 'ID funnela' },
     },
+    fluentcrm_get_funnel_sequences: {
+      description: 'Pobiera wszystkie kroki (sekwencje/akcje) w automatyzacji funnela. Zwraca każdy krok z typem, nazwą akcji, ustawieniami i gałęziami warunkowymi.',
+      params: { funnelId: 'ID funnela' },
+    },
 
     // WEBHOOKS
     fluentcrm_list_webhooks: { description: 'Pobiera webhooks' },
