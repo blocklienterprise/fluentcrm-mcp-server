@@ -805,6 +805,20 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
         },
       },
       {
+        name: 'fluentcrm_create_campaign',
+        description: t('fluentcrm_create_campaign'),
+        inputSchema: {
+          type: 'object',
+          properties: {
+            title: { type: 'string', description: t('fluentcrm_create_campaign', 'title') },
+            subject: { type: 'string', description: t('fluentcrm_create_campaign', 'subject') },
+            template_id: { type: 'number', description: t('fluentcrm_create_campaign', 'template_id') },
+            recipient_list: { type: 'array', items: { type: 'number' }, description: t('fluentcrm_create_campaign', 'recipient_list') },
+          },
+          required: ['title', 'subject'],
+        },
+      },
+      {
         name: 'fluentcrm_pause_campaign',
         description: t('fluentcrm_pause_campaign'),
         inputSchema: {
@@ -1177,6 +1191,8 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         return { content: [{ type: 'text', text: JSON.stringify(await client.detachContactFromList((args as any)?.subscriberId, (args as any)?.listIds), null, 2) }] };
       case 'fluentcrm_list_campaigns':
         return { content: [{ type: 'text', text: JSON.stringify(await client.listCampaigns(args || {}), null, 2) }] };
+      case 'fluentcrm_create_campaign':
+        return { content: [{ type: 'text', text: JSON.stringify(await client.createCampaign(args as any), null, 2) }] };
       case 'fluentcrm_pause_campaign':
         return { content: [{ type: 'text', text: JSON.stringify(await client.pauseCampaign((args as any)?.campaignId), null, 2) }] };
       case 'fluentcrm_resume_campaign':
