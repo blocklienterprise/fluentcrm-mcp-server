@@ -215,6 +215,19 @@ class FluentCRMClient {
   }
 
   async createCampaign(data: any) {
+    // Validate: if any UTM field is supplied, source/medium/campaign are all required
+    const anyUtm = ['utm_source', 'utm_medium', 'utm_campaign', 'utm_term', 'utm_content'].some(f => data[f]);
+    if (anyUtm) {
+      const missingUtm = ['utm_source', 'utm_medium', 'utm_campaign'].filter(f => !data[f]);
+      if (missingUtm.length > 0) {
+        return {
+          success: false,
+          reason: 'validation_error',
+          message: `utm_source, utm_medium, and utm_campaign are all required when using UTM tracking. Missing: ${missingUtm.join(', ')}`,
+        };
+      }
+    }
+
     // FluentCRM's POST /campaigns only accepts 'title' — all other fields
     // (email_subject, template_id, email_body, etc.) must be applied via a follow-up PUT.
     const createResponse = await this.apiClient.post('/campaigns', { title: data.title });
@@ -902,6 +915,8 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
             utm_campaign:   { type: 'string', description: t('fluentcrm_create_campaign', 'utm_campaign') },
             utm_term:       { type: 'string', description: t('fluentcrm_create_campaign', 'utm_term') },
             utm_content:    { type: 'string', description: t('fluentcrm_create_campaign', 'utm_content') },
+            // NOTE: utm_source, utm_medium, and utm_campaign are conditionally required —
+            // if ANY utm_* field is provided, all three must be present or the call will fail.
           },
           required: ['title', 'subject'],
         },
