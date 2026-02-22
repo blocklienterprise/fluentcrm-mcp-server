@@ -352,7 +352,7 @@ class FluentCRMClient {
     const response = await this.apiClient.get(`/funnels/${funnelId}`, {
       params: { 'with[]': 'funnel_sequences' },
     });
-    return response.data?.funnel?.funnel_sequences ?? [];
+    return response.data?.funnel_sequences ?? [];
   }
 
   // ===== WEBHOOKS =====
