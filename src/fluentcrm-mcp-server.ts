@@ -74,7 +74,7 @@ class FluentCRMClient {
     const response = await this.apiClient.get('/subscribers', {
       params: { search: email },
     });
-    return response.data.data?.[0] || null;
+    return response.data?.subscribers?.data?.[0] || null;
   }
 
   async createContact(data: {
@@ -369,7 +369,7 @@ class FluentCRMClient {
     tags?: number[];
     lists?: number[];
   }) {
-    const response = await this.apiClient.post('/webhook', data);
+    const response = await this.apiClient.post('/webhooks', data);
     return response.data;
   }
 
