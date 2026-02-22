@@ -107,6 +107,9 @@ export const locale: Locale = {
         utm_campaign:     'UTM campaign name — REQUIRED when any UTM field is used',
         utm_term:         'UTM term (optional)',
         utm_content:      'UTM content / differentiator (optional)',
+        tags:             'Array of Tag IDs to target as recipients',
+        contact_emails:   'Array of specific recipient email addresses to add to the campaign',
+        scheduled_at:     'Schedule send time as "YYYY-MM-DD HH:mm:ss". Campaign status becomes "scheduled". Omit to leave as draft.',
       },
     },
     fluentcrm_pause_campaign: {

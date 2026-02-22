@@ -240,6 +240,17 @@ class FluentCRMClient {
     if (data.email_pre_header)               extraFields.email_pre_header = data.email_pre_header;
     if (data.design_template)                extraFields.design_template  = data.design_template;
 
+    // Recipient targeting: lists, tags, or specific email addresses
+    if (data.recipient_list || data.lists)   extraFields.lists            = data.recipient_list ?? data.lists;
+    if (data.tags)                           extraFields.tags             = data.tags;
+    if (data.contact_emails)                 extraFields.recipient_emails = data.contact_emails;
+
+    // Scheduling: if scheduled_at is supplied, mark campaign as scheduled
+    if (data.scheduled_at) {
+      extraFields.scheduled_at = data.scheduled_at;
+      extraFields.status       = 'scheduled';
+    }
+
     // UTM tracking
     const utmFields = ['utm_source', 'utm_medium', 'utm_campaign', 'utm_term', 'utm_content'];
     for (const f of utmFields) { if (data[f]) extraFields[f] = data[f]; }
@@ -917,6 +928,9 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
             utm_content:    { type: 'string', description: t('fluentcrm_create_campaign', 'utm_content') },
             // NOTE: utm_source, utm_medium, and utm_campaign are conditionally required —
             // if ANY utm_* field is provided, all three must be present or the call will fail.
+            tags:           { type: 'array',  items: { type: 'number' }, description: t('fluentcrm_create_campaign', 'tags') },
+            contact_emails: { type: 'array',  items: { type: 'string' }, description: t('fluentcrm_create_campaign', 'contact_emails') },
+            scheduled_at:   { type: 'string', description: t('fluentcrm_create_campaign', 'scheduled_at') },
           },
           required: ['title', 'subject'],
         },
