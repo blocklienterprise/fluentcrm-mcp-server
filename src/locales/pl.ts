@@ -109,7 +109,7 @@ export const locale: Locale = {
         utm_content:      'Zawartość UTM (opcjonalne)',
         tags:             'Tablica ID tagów jako odbiorcy kampanii',
         contact_emails:   'Tablica konkretnych adresów email odbiorców',
-        scheduled_at:     'Zaplanuj wysyłkę: "YYYY-MM-DD HH:mm:ss". Status kampanii zmienia się na "scheduled".',
+        scheduled_at:     'Zaplanuj wysyłkę: "YYYY-MM-DD HH:mm:ss" (UTC). Status zmienia się na "pending-scheduled".',
       },
     },
     fluentcrm_pause_campaign: {

@@ -245,11 +245,10 @@ class FluentCRMClient {
     if (data.tags)                           extraFields.tags             = data.tags;
     if (data.contact_emails)                 extraFields.recipient_emails = data.contact_emails;
 
-    // Scheduling: if scheduled_at is supplied, mark campaign as scheduled
-    if (data.scheduled_at) {
-      extraFields.scheduled_at = data.scheduled_at;
-      extraFields.status       = 'scheduled';
-    }
+    // scheduled_at is applied via POST /campaigns/{id}/schedule after the PUT,
+    // because FluentCRM ignores status='scheduled' in PUT requests.
+    // Store it separately — do NOT put it in extraFields for the PUT.
+    const scheduledAt: string | undefined = data.scheduled_at || undefined;
 
     // UTM tracking
     const utmFields = ['utm_source', 'utm_medium', 'utm_campaign', 'utm_term', 'utm_content'];
@@ -298,15 +297,35 @@ class FluentCRMClient {
       extraFields.email_body = data.email_body;
     }
 
+    let finalCampaign: any = campaign;
+
     if (campaignId && Object.keys(extraFields).length > 0) {
       const updateResponse = await this.apiClient.put(`/campaigns/${campaignId}`, {
         title: data.title,  // required by update validator
         ...extraFields,
       });
-      return updateResponse.data?.campaign ?? updateResponse.data;
+      finalCampaign = updateResponse.data?.campaign ?? updateResponse.data;
     }
 
-    return campaign;
+    // Scheduling: must call POST /campaigns/{id}/schedule to set status=pending-scheduled.
+    // PUT /campaigns/{id} ignores any status field, so this must be a separate request.
+    if (campaignId && scheduledAt) {
+      try {
+        const schedResponse = await this.apiClient.post(`/campaigns/${campaignId}/schedule`, {
+          scheduled_at: scheduledAt,
+        });
+        finalCampaign = schedResponse.data?.campaign ?? schedResponse.data ?? finalCampaign;
+      } catch (schedErr: any) {
+        // Schedule call failed — return campaign as draft and surface a warning
+        const errMsg = schedErr?.responseData?.message ?? schedErr?.message ?? 'unknown error';
+        return {
+          ...finalCampaign,
+          _schedule_warning: `Campaign created but scheduling failed: ${errMsg}`,
+        };
+      }
+    }
+
+    return finalCampaign;
   }
 
   async updateCampaign(campaignId: number, data: any) {
