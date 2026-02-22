@@ -53,7 +53,10 @@ class FluentCRMClient {
         const detail = data && Object.keys(data).length > 0
           ? ` Full response: ${JSON.stringify(data)}`
           : '';
-        throw new Error(`FluentCRM API Error: ${message}${detail}`);
+        const err: any = new Error(`FluentCRM API Error: ${message}${detail}`);
+        err.httpStatus   = error.response?.status;
+        err.responseData = data;
+        throw err;
       }
     );
   }
@@ -395,22 +398,21 @@ class FluentCRMClient {
   // These methods prepare for future API or work with existing endpoints
 
   async listSmartLinks(params: any = {}) {
-    // Try to get smart links - this might not work until FluentCRM adds the endpoint
     try {
       const response = await this.apiClient.get('/smart-links', { params });
+      // FluentCRM Pro returns {action_links: [...]} (paginated)
       return response.data;
     } catch (error: any) {
-      // If endpoint doesn't exist, return helpful message
-      if (error.response?.status === 404) {
-        return {
-          success: false,
-          message: "Smart Links API endpoint not available yet in FluentCRM",
-          suggestion: "Use FluentCRM admin panel to manage Smart Links manually",
-          available_endpoints: [
-            "FluentCRM → Smart Links (admin panel)",
-            "Custom WordPress hooks for Smart Links"
-          ]
-        };
+      const status = error.httpStatus;
+      const data   = error.responseData;
+      if (status === 404) {
+        return { success: false, reason: 'endpoint_not_found', message: 'Smart Links API endpoint not available in this FluentCRM version.', suggestion: 'Upgrade FluentCRM or manage Smart Links in the admin panel.' };
+      }
+      if (status === 422 && data?.status === 'disabled') {
+        return { success: false, reason: 'feature_disabled', message: 'Smart Links feature is disabled in FluentCRM.', suggestion: 'Enable Smart Links in FluentCRM → Settings → Smart Links, then retry.' };
+      }
+      if (status === 500) {
+        return { success: false, reason: 'server_error', message: 'FluentCRM returned a 500 error while listing Smart Links. This often means the Smart Links module is not fully active.', suggestion: 'Enable Smart Links in FluentCRM → Settings → Smart Links, then retry.', raw: data };
       }
       throw error;
     }
@@ -418,15 +420,22 @@ class FluentCRMClient {
 
   async getSmartLink(smartLinkId: number) {
     try {
-      const response = await this.apiClient.get(`/smart-links/${smartLinkId}`);
-      return response.data;
+      // FluentCRM Pro has no GET /smart-links/{id} endpoint — simulate by fetching list and filtering
+      const response = await this.apiClient.get('/smart-links');
+      const links: any[] = response.data?.action_links?.data ?? response.data?.action_links ?? [];
+      const found = links.find((l: any) => l.id === smartLinkId);
+      if (!found) {
+        return { success: false, reason: 'not_found', message: `Smart Link ${smartLinkId} not found.` };
+      }
+      return found;
     } catch (error: any) {
-      if (error.response?.status === 404) {
-        return {
-          success: false,
-          message: "Smart Links API endpoint not available yet in FluentCRM",
-          suggestion: "Use FluentCRM admin panel to view Smart Link details"
-        };
+      const status = error.httpStatus;
+      const data   = error.responseData;
+      if (status === 422 && data?.status === 'disabled') {
+        return { success: false, reason: 'feature_disabled', message: 'Smart Links feature is disabled in FluentCRM.', suggestion: 'Enable Smart Links in FluentCRM → Settings → Smart Links, then retry.' };
+      }
+      if (status === 500) {
+        return { success: false, reason: 'server_error', message: 'FluentCRM returned a 500 error. Smart Links module may not be fully active.', suggestion: 'Enable Smart Links in FluentCRM → Settings → Smart Links, then retry.', raw: data };
       }
       throw error;
     }
@@ -443,16 +452,36 @@ class FluentCRMClient {
     auto_login?: boolean;
   }) {
     try {
-      const response = await this.apiClient.post('/smart-links', data);
+      // FluentCRM Pro requires the payload wrapped in a 'link' key
+      const payload = {
+        link: {
+          title: data.title,
+          slug: data.slug,
+          target_url: data.target_url,
+          auto_login: data.auto_login ? 'yes' : 'no',
+          actions: {
+            apply_tags:   data.apply_tags   ?? [],
+            apply_lists:  data.apply_lists  ?? [],
+          },
+          detach_actions: {
+            tags:  data.remove_tags  ?? [],
+            lists: data.remove_lists ?? [],
+          },
+        }
+      };
+      const response = await this.apiClient.post('/smart-links', payload);
       return response.data;
     } catch (error: any) {
-      if (error.response?.status === 404) {
-        return {
-          success: false,
-          message: "Smart Links API endpoint not available yet in FluentCRM",
-          suggestion: "Create Smart Link manually in FluentCRM admin panel",
-          recommended_data: data
-        };
+      const status = error.httpStatus;
+      const resData = error.responseData;
+      if (status === 404) {
+        return { success: false, reason: 'endpoint_not_found', message: 'Smart Links API endpoint not available in this FluentCRM version.', recommended_data: data };
+      }
+      if (status === 422 && resData?.status === 'disabled') {
+        return { success: false, reason: 'feature_disabled', message: 'Smart Links feature is disabled in FluentCRM.', suggestion: 'Enable Smart Links in FluentCRM → Settings → Smart Links, then retry.', requested_data: data };
+      }
+      if (status === 500) {
+        return { success: false, reason: 'server_error', message: 'FluentCRM returned a 500 error while creating the Smart Link. The Smart Links module may not be fully active.', suggestion: 'Enable Smart Links in FluentCRM → Settings → Smart Links, then retry.', raw: resData, requested_data: data };
       }
       throw error;
     }
@@ -460,15 +489,21 @@ class FluentCRMClient {
 
   async updateSmartLink(smartLinkId: number, data: any) {
     try {
-      const response = await this.apiClient.put(`/smart-links/${smartLinkId}`, data);
+      // FluentCRM Pro requires the payload wrapped in a 'link' key
+      const payload = { link: data };
+      const response = await this.apiClient.put(`/smart-links/${smartLinkId}`, payload);
       return response.data;
     } catch (error: any) {
-      if (error.response?.status === 404) {
-        return {
-          success: false,
-          message: "Smart Links API endpoint not available yet in FluentCRM",
-          suggestion: "Update Smart Link manually in FluentCRM admin panel"
-        };
+      const status = error.httpStatus;
+      const resData = error.responseData;
+      if (status === 404) {
+        return { success: false, reason: 'not_found', message: `Smart Link ${smartLinkId} not found.` };
+      }
+      if (status === 422 && resData?.status === 'disabled') {
+        return { success: false, reason: 'feature_disabled', message: 'Smart Links feature is disabled in FluentCRM.', suggestion: 'Enable Smart Links in FluentCRM → Settings → Smart Links, then retry.' };
+      }
+      if (status === 500) {
+        return { success: false, reason: 'server_error', message: 'FluentCRM returned a 500 error while updating the Smart Link.', suggestion: 'Enable Smart Links in FluentCRM → Settings → Smart Links, then retry.', raw: resData };
       }
       throw error;
     }
@@ -479,12 +514,16 @@ class FluentCRMClient {
       const response = await this.apiClient.delete(`/smart-links/${smartLinkId}`);
       return response.data;
     } catch (error: any) {
-      if (error.response?.status === 404) {
-        return {
-          success: false,
-          message: "Smart Links API endpoint not available yet in FluentCRM",
-          suggestion: "Delete Smart Link manually in FluentCRM admin panel"
-        };
+      const status = error.httpStatus;
+      const resData = error.responseData;
+      if (status === 404) {
+        return { success: false, reason: 'not_found', message: `Smart Link ${smartLinkId} not found.` };
+      }
+      if (status === 422 && resData?.status === 'disabled') {
+        return { success: false, reason: 'feature_disabled', message: 'Smart Links feature is disabled in FluentCRM.', suggestion: 'Enable Smart Links in FluentCRM → Settings → Smart Links, then retry.' };
+      }
+      if (status === 500) {
+        return { success: false, reason: 'server_error', message: 'FluentCRM returned a 500 error while deleting the Smart Link.', suggestion: 'Enable Smart Links in FluentCRM → Settings → Smart Links, then retry.', raw: resData };
       }
       throw error;
     }
