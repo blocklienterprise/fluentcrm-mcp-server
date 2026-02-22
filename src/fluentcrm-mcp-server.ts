@@ -226,7 +226,34 @@ class FluentCRMClient {
     if (data.template_id)                    extraFields.template_id      = data.template_id;
     if (data.email_pre_header)               extraFields.email_pre_header = data.email_pre_header;
     if (data.design_template)                extraFields.design_template  = data.design_template;
-    if (data.settings)                       extraFields.settings         = data.settings;
+
+    // UTM tracking
+    const utmFields = ['utm_source', 'utm_medium', 'utm_campaign', 'utm_term', 'utm_content'];
+    for (const f of utmFields) { if (data[f]) extraFields[f] = data[f]; }
+    if (utmFields.some(f => data[f]))        extraFields.utm_status = '1';
+
+    // Build settings object: merge custom mailer settings + any user-supplied settings
+    const baseSettings: any = data.settings ? { ...data.settings } : {};
+    const hasMailer = data.from_name || data.from_email || data.reply_to_name || data.reply_to_email;
+    if (hasMailer) {
+      baseSettings.mailer_settings = {
+        from_name:      data.from_name      ?? '',
+        from_email:     data.from_email     ?? '',
+        reply_to_name:  data.reply_to_name  ?? '',
+        reply_to_email: data.reply_to_email ?? '',
+        is_custom:      'yes',
+      };
+    }
+    if (Object.keys(baseSettings).length > 0) extraFields.settings = baseSettings;
+
+    // A/B test subjects — API uses {key: ratio, value: subject_text}
+    if (Array.isArray(data.subjects) && data.subjects.length > 0) {
+      extraFields.update_subjects = true;
+      extraFields.subjects = data.subjects.map((s: any) => ({
+        value: s.subject ?? s.value,
+        key:   s.ratio   ?? s.key ?? 50,
+      }));
+    }
 
     // If a template_id is given but no email_body, fetch the template's post_content
     // so the campaign body is pre-populated (mirrors the UI "Import Template" behaviour).
@@ -849,10 +876,32 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
         inputSchema: {
           type: 'object',
           properties: {
-            title: { type: 'string', description: t('fluentcrm_create_campaign', 'title') },
-            subject: { type: 'string', description: t('fluentcrm_create_campaign', 'subject') },
-            template_id: { type: 'number', description: t('fluentcrm_create_campaign', 'template_id') },
-            recipient_list: { type: 'array', items: { type: 'number' }, description: t('fluentcrm_create_campaign', 'recipient_list') },
+            title:           { type: 'string', description: t('fluentcrm_create_campaign', 'title') },
+            subject:         { type: 'string', description: t('fluentcrm_create_campaign', 'subject') },
+            template_id:     { type: 'number', description: t('fluentcrm_create_campaign', 'template_id') },
+            recipient_list:  { type: 'array',  items: { type: 'number' }, description: t('fluentcrm_create_campaign', 'recipient_list') },
+            email_pre_header: { type: 'string', description: t('fluentcrm_create_campaign', 'email_pre_header') },
+            subjects: {
+              type: 'array',
+              description: t('fluentcrm_create_campaign', 'subjects'),
+              items: {
+                type: 'object',
+                properties: {
+                  subject: { type: 'string' },
+                  ratio:   { type: 'number', description: 'Priority percentage (e.g. 50)' },
+                },
+                required: ['subject'],
+              },
+            },
+            from_name:      { type: 'string', description: t('fluentcrm_create_campaign', 'from_name') },
+            from_email:     { type: 'string', description: t('fluentcrm_create_campaign', 'from_email') },
+            reply_to_name:  { type: 'string', description: t('fluentcrm_create_campaign', 'reply_to_name') },
+            reply_to_email: { type: 'string', description: t('fluentcrm_create_campaign', 'reply_to_email') },
+            utm_source:     { type: 'string', description: t('fluentcrm_create_campaign', 'utm_source') },
+            utm_medium:     { type: 'string', description: t('fluentcrm_create_campaign', 'utm_medium') },
+            utm_campaign:   { type: 'string', description: t('fluentcrm_create_campaign', 'utm_campaign') },
+            utm_term:       { type: 'string', description: t('fluentcrm_create_campaign', 'utm_term') },
+            utm_content:    { type: 'string', description: t('fluentcrm_create_campaign', 'utm_content') },
           },
           required: ['title', 'subject'],
         },
