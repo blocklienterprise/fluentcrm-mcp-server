@@ -269,31 +269,49 @@ class FluentCRMClient {
     if (Object.keys(baseSettings).length > 0) extraFields.settings = baseSettings;
 
     // Build draft-recipients payload (applied after PUT via POST /draft-recipients).
-    // FluentCRM has two modes:
-    //   list_tag:          {sending_filter:'list_tag',  subscribers:[{list:'all'|id, tag:'all'|id}]}
+    // FluentCRM supports three sending_filter modes:
+    //   list_tag:          {sending_filter:'list_tag', subscribers:[{list:'all'|id, tag:'all'|id}],
+    //                       excludedSubscribers:[{list,tag}]}   ← exclusions only work in this mode
+    //   dynamic_segment:   {sending_filter:'dynamic_segment', dynamic_segment:{slug,id}}
     //   advanced_filters:  {sending_filter:'advanced_filters', advanced_filters:[[{property,operator,value}]]}
-    // contact_ids and contact_emails use advanced_filters; tags/lists use list_tag.
     let draftRecipientsPayload: any = null;
-    const tagIds: number[]   = Array.isArray(data.tags)          ? data.tags          : [];
-    const listIds: number[]  = Array.isArray(data.recipient_list ?? data.lists)
-                                 ? (data.recipient_list ?? data.lists) : [];
-    const contactIds: number[]  = Array.isArray(data.contact_ids)    ? data.contact_ids    : [];
-    const contactEmails: string[] = Array.isArray(data.contact_emails) ? data.contact_emails : [];
+    const tagIds: number[]         = Array.isArray(data.tags)            ? data.tags            : [];
+    const listIds: number[]        = Array.isArray(data.recipient_list ?? data.lists)
+                                       ? (data.recipient_list ?? data.lists) : [];
+    const contactIds: number[]     = Array.isArray(data.contact_ids)      ? data.contact_ids      : [];
+    const contactEmails: string[]  = Array.isArray(data.contact_emails)   ? data.contact_emails   : [];
+    const excludeTagIds: number[]  = Array.isArray(data.exclude_tags)     ? data.exclude_tags     : [];
+    const excludeListIds: number[] = Array.isArray(data.exclude_lists)    ? data.exclude_lists    : [];
 
-    if (contactIds.length > 0 || contactEmails.length > 0) {
-      // advanced_filters mode — can combine id and email filters
+    if (Array.isArray(data.advanced_filters) && data.advanced_filters.length > 0) {
+      // User-supplied raw advanced_filters groups — full By Advanced Filter mode
+      draftRecipientsPayload = { sending_filter: 'advanced_filters', advanced_filters: data.advanced_filters };
+    } else if (contactIds.length > 0 || contactEmails.length > 0) {
+      // advanced_filters mode — built from contact_ids / contact_emails
       const filterGroups: any[][] = [];
       if (contactIds.length > 0)    filterGroups.push([{ property: 'id',    operator: 'in', value: contactIds }]);
       if (contactEmails.length > 0) filterGroups.push([{ property: 'email', operator: 'in', value: contactEmails }]);
       draftRecipientsPayload = { sending_filter: 'advanced_filters', advanced_filters: filterGroups };
+    } else if (data.dynamic_segment_slug && data.dynamic_segment_id) {
+      // Dynamic segment targeting (e.g. slug:'tag', id:3  or  slug:'woo_customer', id:X)
+      draftRecipientsPayload = {
+        sending_filter:  'dynamic_segment',
+        dynamic_segment: { slug: data.dynamic_segment_slug, id: data.dynamic_segment_id },
+      };
     } else if (tagIds.length > 0 || listIds.length > 0) {
-      // list_tag mode: each tag→{list:'all', tag:id}, each list→{list:id, tag:'all'}
-      // If both provided, combine as {list:id, tag:id} pairs (cartesian first match) or separate entries
+      // list_tag mode: {list:'all', tag:id} targets by tag; {list:id, tag:'all'} targets by list
       const subscribers: any[] = [
         ...tagIds.map(t  => ({ list: 'all', tag: t })),
-        ...listIds.map(l => ({ list: l, tag: 'all' })),
+        ...listIds.map(l => ({ list: l,     tag: 'all' })),
       ];
       draftRecipientsPayload = { sending_filter: 'list_tag', subscribers };
+      // Excluded contacts: same {list,tag} shape — subtracted from included set
+      if (excludeTagIds.length > 0 || excludeListIds.length > 0) {
+        draftRecipientsPayload.excludedSubscribers = [
+          ...excludeTagIds.map(t  => ({ list: 'all', tag: t })),
+          ...excludeListIds.map(l => ({ list: l,     tag: 'all' })),
+        ];
+      }
     }
 
     // A/B test subjects — API uses {key: ratio, value: subject_text}
@@ -1002,10 +1020,15 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
             utm_content:    { type: 'string', description: t('fluentcrm_create_campaign', 'utm_content') },
             // NOTE: utm_source, utm_medium, and utm_campaign are conditionally required —
             // if ANY utm_* field is provided, all three must be present or the call will fail.
-            tags:           { type: 'array',  items: { type: 'number' }, description: t('fluentcrm_create_campaign', 'tags') },
-            contact_emails: { type: 'array',  items: { type: 'string' }, description: t('fluentcrm_create_campaign', 'contact_emails') },
-            contact_ids:    { type: 'array',  items: { type: 'number' }, description: t('fluentcrm_create_campaign', 'contact_ids') },
-            scheduled_at:   { type: 'string', description: t('fluentcrm_create_campaign', 'scheduled_at') },
+            tags:                   { type: 'array',  items: { type: 'number' }, description: t('fluentcrm_create_campaign', 'tags') },
+            exclude_tags:           { type: 'array',  items: { type: 'number' }, description: t('fluentcrm_create_campaign', 'exclude_tags') },
+            exclude_lists:          { type: 'array',  items: { type: 'number' }, description: t('fluentcrm_create_campaign', 'exclude_lists') },
+            contact_emails:         { type: 'array',  items: { type: 'string' }, description: t('fluentcrm_create_campaign', 'contact_emails') },
+            contact_ids:            { type: 'array',  items: { type: 'number' }, description: t('fluentcrm_create_campaign', 'contact_ids') },
+            advanced_filters:       { type: 'array',  items: { type: 'array'  }, description: t('fluentcrm_create_campaign', 'advanced_filters') },
+            dynamic_segment_slug:   { type: 'string', description: t('fluentcrm_create_campaign', 'dynamic_segment_slug') },
+            dynamic_segment_id:     { type: 'number', description: t('fluentcrm_create_campaign', 'dynamic_segment_id') },
+            scheduled_at:           { type: 'string', description: t('fluentcrm_create_campaign', 'scheduled_at') },
           },
           required: ['title', 'subject'],
         },
