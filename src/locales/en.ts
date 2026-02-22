@@ -148,6 +148,10 @@ export const locale: Locale = {
       description: 'Removes one or more contacts from a funnel',
       params: { funnelId: 'Funnel ID', subscriber_ids: 'Array of subscriber (contact) IDs to remove' },
     },
+    fluentcrm_add_subscribers_to_funnel: {
+      description: 'Adds one or more contacts to a funnel (automation). Requires FluentCRM Pro.',
+      params: { funnelId: 'Funnel ID to enroll the contacts into', subscriber_ids: 'Array of contact IDs to add to the funnel' },
+    },
     fluentcrm_get_funnel_report: {
       description: 'Retrieves performance report for a funnel',
       params: { funnelId: 'Funnel ID' },
