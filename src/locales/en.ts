@@ -120,9 +120,41 @@ export const locale: Locale = {
 
     // AUTOMATIONS
     fluentcrm_list_automations: { description: 'Retrieves automations (funnels)' },
-    fluentcrm_create_automation: {
-      description: 'Creates a new automation',
-      params: { title: 'Automation name', trigger: 'Trigger type' },
+    fluentcrm_get_automation: {
+      description: 'Retrieves a specific automation funnel by ID',
+      params: { funnelId: 'Funnel ID' },
+    },
+    fluentcrm_update_funnel_status: {
+      description: 'Updates the status of a funnel (published, draft, or paused)',
+      params: { funnelId: 'Funnel ID', status: 'New status: published, draft, or paused' },
+    },
+    fluentcrm_duplicate_funnel: {
+      description: 'Creates a copy of an existing funnel',
+      params: { funnelId: 'Funnel ID to duplicate' },
+    },
+    fluentcrm_delete_automation: {
+      description: 'Deletes a funnel and stops all active sequences',
+      params: { funnelId: 'Funnel ID to delete' },
+    },
+    fluentcrm_get_funnel_subscribers: {
+      description: 'Retrieves subscribers enrolled in a funnel',
+      params: { funnelId: 'Funnel ID', status: 'Filter by status: active, completed, or cancelled' },
+    },
+    fluentcrm_update_funnel_subscriber_status: {
+      description: 'Updates the status of a contact already enrolled in a funnel (e.g. active, paused, cancelled)',
+      params: { funnelId: 'Funnel ID', subscriberId: 'Subscriber (contact) ID', status: 'New status: active, paused, or cancelled' },
+    },
+    fluentcrm_remove_funnel_subscriber: {
+      description: 'Removes one or more contacts from a funnel',
+      params: { funnelId: 'Funnel ID', subscriber_ids: 'Array of subscriber (contact) IDs to remove' },
+    },
+    fluentcrm_add_subscribers_to_funnel: {
+      description: 'Adds one or more contacts to a funnel (automation). Requires FluentCRM Pro.',
+      params: { funnelId: 'Funnel ID to enroll the contacts into', subscriber_ids: 'Array of contact IDs to add to the funnel' },
+    },
+    fluentcrm_get_funnel_report: {
+      description: 'Retrieves performance report for a funnel',
+      params: { funnelId: 'Funnel ID' },
     },
 
     // WEBHOOKS

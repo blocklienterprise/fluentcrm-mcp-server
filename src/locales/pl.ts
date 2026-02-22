@@ -120,9 +120,41 @@ export const locale: Locale = {
 
     // AUTOMATYZACJE
     fluentcrm_list_automations: { description: 'Pobiera automatyzacje (funnels)' },
-    fluentcrm_create_automation: {
-      description: 'Tworzy nową automatyzację',
-      params: { title: 'Nazwa automatyzacji', trigger: 'Typ triggera' },
+    fluentcrm_get_automation: {
+      description: 'Pobiera konkretną automatyzację (funnel) po ID',
+      params: { funnelId: 'ID funnela' },
+    },
+    fluentcrm_update_funnel_status: {
+      description: 'Aktualizuje status funnela (published, draft lub paused)',
+      params: { funnelId: 'ID funnela', status: 'Nowy status: published, draft lub paused' },
+    },
+    fluentcrm_duplicate_funnel: {
+      description: 'Tworzy kopię istniejącego funnela',
+      params: { funnelId: 'ID funnela do skopiowania' },
+    },
+    fluentcrm_delete_automation: {
+      description: 'Usuwa funnel i zatrzymuje wszystkie aktywne sekwencje',
+      params: { funnelId: 'ID funnela do usunięcia' },
+    },
+    fluentcrm_get_funnel_subscribers: {
+      description: 'Pobiera subskrybentów zapisanych do funnela',
+      params: { funnelId: 'ID funnela', status: 'Filtruj po statusie: active, completed lub cancelled' },
+    },
+    fluentcrm_update_funnel_subscriber_status: {
+      description: 'Aktualizuje status kontaktu zapisanego w lejku (np. active, paused, cancelled)',
+      params: { funnelId: 'ID lejka', subscriberId: 'ID subskrybenta (kontaktu)', status: 'Nowy status: active, paused lub cancelled' },
+    },
+    fluentcrm_remove_funnel_subscriber: {
+      description: 'Usuwa jeden lub więcej kontaktów z funnela',
+      params: { funnelId: 'ID funnela', subscriber_ids: 'Tablica ID subskrybentów do usunięcia' },
+    },
+    fluentcrm_add_subscribers_to_funnel: {
+      description: 'Dodaje jeden lub więcej kontaktów do funnela (automatyzacji). Wymaga FluentCRM Pro.',
+      params: { funnelId: 'ID funnela, do którego zostaną zapisani kontakci', subscriber_ids: 'Tablica ID kontaktów do dodania do funnela' },
+    },
+    fluentcrm_get_funnel_report: {
+      description: 'Pobiera raport wydajności funnela',
+      params: { funnelId: 'ID funnela' },
     },
 
     // WEBHOOKS
