@@ -267,6 +267,10 @@ class FluentCRMClient {
         is_custom:      'yes',
       };
     }
+    // contact_ids: filter recipients to specific subscriber IDs via settings.advanced_filters
+    if (Array.isArray(data.contact_ids) && data.contact_ids.length > 0) {
+      baseSettings.advanced_filters = [[{ property: 'id', operator: 'in', value: data.contact_ids }]];
+    }
     if (Object.keys(baseSettings).length > 0) extraFields.settings = baseSettings;
 
     // A/B test subjects — API uses {key: ratio, value: subject_text}
@@ -346,6 +350,23 @@ class FluentCRMClient {
   async deleteCampaign(campaignId: number) {
     const response = await this.apiClient.delete(`/campaigns/${campaignId}`);
     return response.data;
+  }
+
+  async addContactsToCampaign(campaignId: number, contactIds: number[]) {
+    // Fetch the current campaign to preserve all existing settings
+    const getResp = await this.apiClient.get(`/campaigns/${campaignId}`);
+    const current = getResp.data?.campaign ?? getResp.data;
+    const existingSettings = current?.settings ?? {};
+    // Merge contact IDs as an advanced_filter on subscriber ID
+    const updatedSettings = {
+      ...existingSettings,
+      advanced_filters: [[{ property: 'id', operator: 'in', value: contactIds }]],
+    };
+    const updateResp = await this.apiClient.put(`/campaigns/${campaignId}`, {
+      title: current?.title,
+      settings: updatedSettings,
+    });
+    return updateResp.data?.campaign ?? updateResp.data;
   }
 
   // ===== EMAIL TEMPLATES =====
@@ -949,6 +970,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
             // if ANY utm_* field is provided, all three must be present or the call will fail.
             tags:           { type: 'array',  items: { type: 'number' }, description: t('fluentcrm_create_campaign', 'tags') },
             contact_emails: { type: 'array',  items: { type: 'string' }, description: t('fluentcrm_create_campaign', 'contact_emails') },
+            contact_ids:    { type: 'array',  items: { type: 'number' }, description: t('fluentcrm_create_campaign', 'contact_ids') },
             scheduled_at:   { type: 'string', description: t('fluentcrm_create_campaign', 'scheduled_at') },
           },
           required: ['title', 'subject'],
@@ -985,6 +1007,18 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
             campaignId: { type: 'number', description: t('fluentcrm_delete_campaign', 'campaignId') },
           },
           required: ['campaignId'],
+        },
+      },
+      {
+        name: 'fluentcrm_add_contacts_to_campaign',
+        description: t('fluentcrm_add_contacts_to_campaign'),
+        inputSchema: {
+          type: 'object',
+          properties: {
+            campaignId:  { type: 'number', description: t('fluentcrm_add_contacts_to_campaign', 'campaignId') },
+            contact_ids: { type: 'array', items: { type: 'number' }, description: t('fluentcrm_add_contacts_to_campaign', 'contact_ids') },
+          },
+          required: ['campaignId', 'contact_ids'],
         },
       },
 
@@ -1335,6 +1369,8 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         return { content: [{ type: 'text', text: JSON.stringify(await client.resumeCampaign((args as any)?.campaignId), null, 2) }] };
       case 'fluentcrm_delete_campaign':
         return { content: [{ type: 'text', text: JSON.stringify(await client.deleteCampaign((args as any)?.campaignId), null, 2) }] };
+      case 'fluentcrm_add_contacts_to_campaign':
+        return { content: [{ type: 'text', text: JSON.stringify(await client.addContactsToCampaign((args as any)?.campaignId, (args as any)?.contact_ids), null, 2) }] };
       case 'fluentcrm_list_email_templates':
         return { content: [{ type: 'text', text: JSON.stringify(await client.listEmailTemplates(), null, 2) }] };
       case 'fluentcrm_create_email_template':

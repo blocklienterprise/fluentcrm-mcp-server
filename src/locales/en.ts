@@ -109,6 +109,7 @@ export const locale: Locale = {
         utm_content:      'UTM content / differentiator (optional)',
         tags:             'Array of Tag IDs to target as recipients',
         contact_emails:   'Array of specific recipient email addresses to add to the campaign',
+        contact_ids:      'Array of specific subscriber IDs to restrict recipients to (uses advanced_filters)',
         scheduled_at:     'Schedule send time as "YYYY-MM-DD HH:mm:ss" (UTC). Sets campaign status to "pending-scheduled". Omit to leave as draft.',
       },
     },
@@ -123,6 +124,13 @@ export const locale: Locale = {
     fluentcrm_delete_campaign: {
       description: 'Deletes a campaign',
       params: { campaignId: 'Campaign ID' },
+    },
+    fluentcrm_add_contacts_to_campaign: {
+      description: 'Adds specific contacts (by subscriber ID) to an existing campaign as recipients',
+      params: {
+        campaignId:  'ID of the campaign to update',
+        contact_ids: 'Array of subscriber IDs to add as recipients (replaces any existing advanced_filters)',
+      },
     },
 
     // EMAIL TEMPLATES

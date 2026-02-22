@@ -109,6 +109,7 @@ export const locale: Locale = {
         utm_content:      'Zawartość UTM (opcjonalne)',
         tags:             'Tablica ID tagów jako odbiorcy kampanii',
         contact_emails:   'Tablica konkretnych adresów email odbiorców',
+        contact_ids:      'Tablica ID konkretnych subskrybentów jako odbiorcy (używa advanced_filters)',
         scheduled_at:     'Zaplanuj wysyłkę: "YYYY-MM-DD HH:mm:ss" (UTC). Status zmienia się na "pending-scheduled".',
       },
     },
@@ -123,6 +124,13 @@ export const locale: Locale = {
     fluentcrm_delete_campaign: {
       description: 'Usuwa kampanię',
       params: { campaignId: 'ID kampanii' },
+    },
+    fluentcrm_add_contacts_to_campaign: {
+      description: 'Dodaje konkretne kontakty (po ID subskrybenta) do istniejącej kampanii jako odbiorcy',
+      params: {
+        campaignId:  'ID kampanii do zaktualizowania',
+        contact_ids: 'Tablica ID subskrybentów do dodania (nadpisuje istniejące advanced_filters)',
+      },
     },
 
     // EMAIL TEMPLATES
