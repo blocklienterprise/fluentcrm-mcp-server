@@ -215,8 +215,29 @@ class FluentCRMClient {
   }
 
   async createCampaign(data: any) {
-    const response = await this.apiClient.post('/campaigns', data);
-    return response.data;
+    // FluentCRM's POST /campaigns only accepts 'title' — all other fields
+    // (email_subject, template_id, etc.) must be applied via a follow-up PUT.
+    const createResponse = await this.apiClient.post('/campaigns', { title: data.title });
+    const campaign = createResponse.data;
+    const campaignId = campaign?.id;
+
+    const extraFields: any = {};
+    if (data.subject || data.email_subject)  extraFields.email_subject  = data.subject ?? data.email_subject;
+    if (data.template_id)                    extraFields.template_id    = data.template_id;
+    if (data.email_body)                     extraFields.email_body     = data.email_body;
+    if (data.email_pre_header)               extraFields.email_pre_header = data.email_pre_header;
+    if (data.design_template)                extraFields.design_template  = data.design_template;
+    if (data.settings)                       extraFields.settings         = data.settings;
+
+    if (campaignId && Object.keys(extraFields).length > 0) {
+      const updateResponse = await this.apiClient.put(`/campaigns/${campaignId}`, {
+        title: data.title,  // required by update validator
+        ...extraFields,
+      });
+      return updateResponse.data?.campaign ?? updateResponse.data;
+    }
+
+    return campaign;
   }
 
   async updateCampaign(campaignId: number, data: any) {
