@@ -216,18 +216,36 @@ class FluentCRMClient {
 
   async createCampaign(data: any) {
     // FluentCRM's POST /campaigns only accepts 'title' — all other fields
-    // (email_subject, template_id, etc.) must be applied via a follow-up PUT.
+    // (email_subject, template_id, email_body, etc.) must be applied via a follow-up PUT.
     const createResponse = await this.apiClient.post('/campaigns', { title: data.title });
     const campaign = createResponse.data;
     const campaignId = campaign?.id;
 
     const extraFields: any = {};
-    if (data.subject || data.email_subject)  extraFields.email_subject  = data.subject ?? data.email_subject;
-    if (data.template_id)                    extraFields.template_id    = data.template_id;
-    if (data.email_body)                     extraFields.email_body     = data.email_body;
+    if (data.subject || data.email_subject)  extraFields.email_subject    = data.subject ?? data.email_subject;
+    if (data.template_id)                    extraFields.template_id      = data.template_id;
     if (data.email_pre_header)               extraFields.email_pre_header = data.email_pre_header;
     if (data.design_template)                extraFields.design_template  = data.design_template;
     if (data.settings)                       extraFields.settings         = data.settings;
+
+    // If a template_id is given but no email_body, fetch the template's post_content
+    // so the campaign body is pre-populated (mirrors the UI "Import Template" behaviour).
+    if (data.template_id && !data.email_body) {
+      try {
+        const tplResponse = await this.apiClient.get(`/templates/${data.template_id}`);
+        const tpl = tplResponse.data?.template ?? tplResponse.data;
+        if (tpl?.post_content) {
+          extraFields.email_body = tpl.post_content;
+        }
+        if (tpl?.design_template && !data.design_template) {
+          extraFields.design_template = tpl.design_template;
+        }
+      } catch (_) {
+        // template fetch failed — proceed without body
+      }
+    } else if (data.email_body) {
+      extraFields.email_body = data.email_body;
+    }
 
     if (campaignId && Object.keys(extraFields).length > 0) {
       const updateResponse = await this.apiClient.put(`/campaigns/${campaignId}`, {
