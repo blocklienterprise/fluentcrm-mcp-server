@@ -240,10 +240,9 @@ class FluentCRMClient {
     if (data.email_pre_header)               extraFields.email_pre_header = data.email_pre_header;
     if (data.design_template)                extraFields.design_template  = data.design_template;
 
-    // Recipient targeting: lists, tags, or specific email addresses
-    if (data.recipient_list || data.lists)   extraFields.lists            = data.recipient_list ?? data.lists;
-    if (data.tags)                           extraFields.tags             = data.tags;
-    if (data.contact_emails)                 extraFields.recipient_emails = data.contact_emails;
+    // NOTE: lists/tags/contact_emails/contact_ids are NOT sent via PUT.
+    // FluentCRM ignores them on PUT — recipients must be set via POST /draft-recipients.
+    // We build the draftRecipientsPayload below and call it after the PUT.
 
     // scheduled_at is applied via POST /campaigns/{id}/schedule after the PUT,
     // because FluentCRM ignores status='scheduled' in PUT requests.
@@ -267,11 +266,35 @@ class FluentCRMClient {
         is_custom:      'yes',
       };
     }
-    // contact_ids: filter recipients to specific subscriber IDs via settings.advanced_filters
-    if (Array.isArray(data.contact_ids) && data.contact_ids.length > 0) {
-      baseSettings.advanced_filters = [[{ property: 'id', operator: 'in', value: data.contact_ids }]];
-    }
     if (Object.keys(baseSettings).length > 0) extraFields.settings = baseSettings;
+
+    // Build draft-recipients payload (applied after PUT via POST /draft-recipients).
+    // FluentCRM has two modes:
+    //   list_tag:          {sending_filter:'list_tag',  subscribers:[{list:'all'|id, tag:'all'|id}]}
+    //   advanced_filters:  {sending_filter:'advanced_filters', advanced_filters:[[{property,operator,value}]]}
+    // contact_ids and contact_emails use advanced_filters; tags/lists use list_tag.
+    let draftRecipientsPayload: any = null;
+    const tagIds: number[]   = Array.isArray(data.tags)          ? data.tags          : [];
+    const listIds: number[]  = Array.isArray(data.recipient_list ?? data.lists)
+                                 ? (data.recipient_list ?? data.lists) : [];
+    const contactIds: number[]  = Array.isArray(data.contact_ids)    ? data.contact_ids    : [];
+    const contactEmails: string[] = Array.isArray(data.contact_emails) ? data.contact_emails : [];
+
+    if (contactIds.length > 0 || contactEmails.length > 0) {
+      // advanced_filters mode — can combine id and email filters
+      const filterGroups: any[][] = [];
+      if (contactIds.length > 0)    filterGroups.push([{ property: 'id',    operator: 'in', value: contactIds }]);
+      if (contactEmails.length > 0) filterGroups.push([{ property: 'email', operator: 'in', value: contactEmails }]);
+      draftRecipientsPayload = { sending_filter: 'advanced_filters', advanced_filters: filterGroups };
+    } else if (tagIds.length > 0 || listIds.length > 0) {
+      // list_tag mode: each tag→{list:'all', tag:id}, each list→{list:id, tag:'all'}
+      // If both provided, combine as {list:id, tag:id} pairs (cartesian first match) or separate entries
+      const subscribers: any[] = [
+        ...tagIds.map(t  => ({ list: 'all', tag: t })),
+        ...listIds.map(l => ({ list: l, tag: 'all' })),
+      ];
+      draftRecipientsPayload = { sending_filter: 'list_tag', subscribers };
+    }
 
     // A/B test subjects — API uses {key: ratio, value: subject_text}
     if (Array.isArray(data.subjects) && data.subjects.length > 0) {
@@ -309,6 +332,24 @@ class FluentCRMClient {
         ...extraFields,
       });
       finalCampaign = updateResponse.data?.campaign ?? updateResponse.data;
+    }
+
+    // Apply recipient targeting via /draft-recipients (tags, lists, contact_ids, contact_emails).
+    // This must happen AFTER the PUT so the campaign exists and settings are saved.
+    if (campaignId && draftRecipientsPayload) {
+      try {
+        const drResponse = await this.apiClient.post(
+          `/campaigns/${campaignId}/draft-recipients`,
+          draftRecipientsPayload
+        );
+        // draft-recipients returns {message, count} — merge count into finalCampaign
+        if (drResponse.data?.count !== undefined) {
+          finalCampaign = { ...finalCampaign, recipients_count: drResponse.data.count };
+        }
+      } catch (drErr: any) {
+        const errMsg = drErr?.responseData?.message ?? drErr?.message ?? 'unknown error';
+        finalCampaign = { ...finalCampaign, _recipients_warning: `Recipient targeting failed: ${errMsg}` };
+      }
     }
 
     // Scheduling: must call POST /campaigns/{id}/schedule to set status=pending-scheduled.
@@ -353,20 +394,13 @@ class FluentCRMClient {
   }
 
   async addContactsToCampaign(campaignId: number, contactIds: number[]) {
-    // Fetch the current campaign to preserve all existing settings
-    const getResp = await this.apiClient.get(`/campaigns/${campaignId}`);
-    const current = getResp.data?.campaign ?? getResp.data;
-    const existingSettings = current?.settings ?? {};
-    // Merge contact IDs as an advanced_filter on subscriber ID
-    const updatedSettings = {
-      ...existingSettings,
+    // Use /draft-recipients with advanced_filters to target specific subscriber IDs.
+    // This is the correct FluentCRM API pattern — PUT /campaigns/{id} ignores recipient settings.
+    const response = await this.apiClient.post(`/campaigns/${campaignId}/draft-recipients`, {
+      sending_filter: 'advanced_filters',
       advanced_filters: [[{ property: 'id', operator: 'in', value: contactIds }]],
-    };
-    const updateResp = await this.apiClient.put(`/campaigns/${campaignId}`, {
-      title: current?.title,
-      settings: updatedSettings,
     });
-    return updateResp.data?.campaign ?? updateResp.data;
+    return response.data;
   }
 
   // ===== EMAIL TEMPLATES =====
