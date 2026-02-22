@@ -86,6 +86,9 @@ export const locale: Locale = {
     },
 
     // KAMPANIE
+    fluentcrm_list_dynamic_segments: {
+      description: 'Listuje wszystkie dostępne segmenty dynamiczne na tej stronie (np. WordPress Users, WooCommerce Customers). Zwraca slug, tytuł i opis każdego segmentu.',
+    },
     fluentcrm_list_campaigns: {
       description: 'Pobiera listę kampanii email',
     },
@@ -113,8 +116,8 @@ export const locale: Locale = {
         contact_emails:       'Tablica konkretnych adresów email odbiorców (tryb zaawansowanych filtrów)',
         contact_ids:          'Tablica ID konkretnych subskrybentów (tryb zaawansowanych filtrów)',
         advanced_filters:     'Surowe grupy zaawansowanych filtrów — tablica grup filtrów [{property, operator, value}] (AND w grupie, OR między grupami)',
-        dynamic_segment_slug: 'Dynamiczny segment: slug segmentu (np. "tag", "list", "woo_customer"). Wymagane z dynamic_segment_id.',
-        dynamic_segment_id:   'Dynamiczny segment: ID segmentu. Wymagane z dynamic_segment_slug.',
+        dynamic_segment_slug: 'Tryb Dynamic Segment: slug segmentu. Wbudowane slugi: "wp_users", "edd_customers", "wc_customers". Użyj fluentcrm_list_dynamic_segments aby zobaczyć wszystkie opcje. Wymagane z dynamic_segment_id.',
+        dynamic_segment_id:   'Tryb Dynamic Segment: ID segmentu. Dla wbudowanych segmentów systemowych (wp_users, edd_customers, wc_customers) użyj 0. Wymagane z dynamic_segment_slug.',
         scheduled_at:         'Zaplanuj wysyłkę: "YYYY-MM-DD HH:mm:ss" (UTC). Status zmienia się na "pending-scheduled".',
       },
     },

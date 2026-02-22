@@ -86,6 +86,9 @@ export const locale: Locale = {
     },
 
     // CAMPAIGNS
+    fluentcrm_list_dynamic_segments: {
+      description: 'Lists all available dynamic segments on this site (e.g. WordPress Users, WooCommerce Customers). Returns slug, title, and description for each. Use the slug + id=0 as dynamic_segment_slug/dynamic_segment_id in fluentcrm_create_campaign.',
+    },
     fluentcrm_list_campaigns: {
       description: 'Retrieves a list of email campaigns',
     },
@@ -113,8 +116,8 @@ export const locale: Locale = {
         contact_emails:       'Array of specific recipient email addresses (uses By Advanced Filter mode)',
         contact_ids:          'Array of specific subscriber IDs to restrict recipients to (uses By Advanced Filter mode)',
         advanced_filters:     'Raw By Advanced Filter groups — array of filter groups, each group is an array of {property, operator, value} conditions (AND within group, OR between groups)',
-        dynamic_segment_slug: 'By Dynamic Segment: segment slug (e.g. "tag", "list", "woo_customer"). Must be paired with dynamic_segment_id.',
-        dynamic_segment_id:   'By Dynamic Segment: ID of the dynamic segment. Must be paired with dynamic_segment_slug.',
+        dynamic_segment_slug: 'By Dynamic Segment mode: the segment slug. Known built-in slugs: "wp_users" (WordPress Users), "edd_customers" (Easy Digital Downloads Customers), "wc_customers" (WooCommerce Customers). Use fluentcrm_list_dynamic_segments to discover all available options. Must be paired with dynamic_segment_id.',
+        dynamic_segment_id:   'By Dynamic Segment mode: ID of the segment. For all built-in system segments (wp_users, edd_customers, wc_customers) use 0. Must be paired with dynamic_segment_slug.',
         scheduled_at:         'Schedule send time as "YYYY-MM-DD HH:mm:ss" (UTC). Sets campaign status to "pending-scheduled". Omit to leave as draft.',
       },
     },

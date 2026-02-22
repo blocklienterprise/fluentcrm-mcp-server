@@ -209,6 +209,13 @@ class FluentCRMClient {
     return response.data;
   }
 
+  async listDynamicSegments() {
+    // Fetches all available dynamic segments registered on this site.
+    // System segments (wp_users, edd_customers, wc_customers) have id=0.
+    const response = await this.apiClient.get('/reports/options', { params: { fields: 'segments' } });
+    return response.data?.options?.segments ?? [];
+  }
+
   async getCampaign(campaignId: number) {
     const response = await this.apiClient.get(`/campaigns/${campaignId}`);
     return response.data;
@@ -976,6 +983,11 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
 
       // ===== CAMPAIGNS =====
       {
+        name: 'fluentcrm_list_dynamic_segments',
+        description: t('fluentcrm_list_dynamic_segments'),
+        inputSchema: { type: 'object', properties: {} },
+      },
+      {
         name: 'fluentcrm_list_campaigns',
         description: t('fluentcrm_list_campaigns'),
         inputSchema: {
@@ -1026,7 +1038,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
             contact_emails:         { type: 'array',  items: { type: 'string' }, description: t('fluentcrm_create_campaign', 'contact_emails') },
             contact_ids:            { type: 'array',  items: { type: 'number' }, description: t('fluentcrm_create_campaign', 'contact_ids') },
             advanced_filters:       { type: 'array',  items: { type: 'array'  }, description: t('fluentcrm_create_campaign', 'advanced_filters') },
-            dynamic_segment_slug:   { type: 'string', description: t('fluentcrm_create_campaign', 'dynamic_segment_slug') },
+            dynamic_segment_slug:   { type: 'string', enum: ['wp_users', 'edd_customers', 'wc_customers'], description: t('fluentcrm_create_campaign', 'dynamic_segment_slug') },
             dynamic_segment_id:     { type: 'number', description: t('fluentcrm_create_campaign', 'dynamic_segment_id') },
             scheduled_at:           { type: 'string', description: t('fluentcrm_create_campaign', 'scheduled_at') },
           },
@@ -1416,6 +1428,8 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         return { content: [{ type: 'text', text: JSON.stringify(await client.attachContactToList((args as any)?.subscriberId, (args as any)?.listIds), null, 2) }] };
       case 'fluentcrm_detach_contact_from_list':
         return { content: [{ type: 'text', text: JSON.stringify(await client.detachContactFromList((args as any)?.subscriberId, (args as any)?.listIds), null, 2) }] };
+      case 'fluentcrm_list_dynamic_segments':
+        return { content: [{ type: 'text', text: JSON.stringify(await client.listDynamicSegments(), null, 2) }] };
       case 'fluentcrm_list_campaigns':
         return { content: [{ type: 'text', text: JSON.stringify(await client.listCampaigns(args || {}), null, 2) }] };
       case 'fluentcrm_create_campaign':
