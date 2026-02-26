@@ -86,16 +86,39 @@ export const locale: Locale = {
     },
 
     // CAMPAIGNS
+    fluentcrm_list_dynamic_segments: {
+      description: 'Lists all available dynamic segments on this site (e.g. WordPress Users, WooCommerce Customers). Returns slug, title, and description for each. Use the slug + id=0 as dynamic_segment_slug/dynamic_segment_id in fluentcrm_create_campaign.',
+    },
     fluentcrm_list_campaigns: {
       description: 'Retrieves a list of email campaigns',
     },
     fluentcrm_create_campaign: {
       description: 'Creates a new email campaign',
       params: {
-        title: 'Campaign title',
-        subject: 'Email subject',
-        template_id: 'Template ID',
-        recipient_list: 'List IDs',
+        title:            'Campaign title',
+        subject:          'Primary email subject line',
+        template_id:      'ID of an existing email template to import as body',
+        recipient_list:   'Array of List IDs to send to',
+        email_pre_header: 'Preview text shown after the subject in inboxes',
+        subjects:         'A/B test subjects array: [{subject, ratio}] — ratio is priority % (must total 100)',
+        from_name:        'Custom sender name (overrides SMTP default)',
+        from_email:       'Custom sender email address',
+        reply_to_name:    'Reply-To name',
+        reply_to_email:   'Reply-To email address',
+        utm_source:       'UTM source (e.g. newsletter) — REQUIRED when any UTM field is used',
+        utm_medium:       'UTM medium (e.g. email) — REQUIRED when any UTM field is used',
+        utm_campaign:     'UTM campaign name — REQUIRED when any UTM field is used',
+        utm_term:         'UTM term (optional)',
+        utm_content:      'UTM content / differentiator (optional)',
+        tags:                 'Array of Tag IDs to include as recipients (By List & Tag mode)',
+        exclude_tags:         'Array of Tag IDs to exclude from recipients (subtracted from included set, list_tag mode only)',
+        exclude_lists:        'Array of List IDs to exclude from recipients (subtracted from included set, list_tag mode only)',
+        contact_emails:       'Array of specific recipient email addresses (uses By Advanced Filter mode)',
+        contact_ids:          'Array of specific subscriber IDs to restrict recipients to (uses By Advanced Filter mode)',
+        advanced_filters:     'Raw By Advanced Filter groups — array of filter groups, each group is an array of {property, operator, value} conditions (AND within group, OR between groups)',
+        dynamic_segment_slug: 'By Dynamic Segment mode: the segment slug. Known built-in slugs: "wp_users" (WordPress Users), "edd_customers" (Easy Digital Downloads Customers), "wc_customers" (WooCommerce Customers). Use fluentcrm_list_dynamic_segments to discover all available options. Must be paired with dynamic_segment_id.',
+        dynamic_segment_id:   'By Dynamic Segment mode: ID of the segment. For all built-in system segments (wp_users, edd_customers, wc_customers) use 0. Must be paired with dynamic_segment_slug.',
+        scheduled_at:         'Schedule send time as "YYYY-MM-DD HH:mm:ss" (UTC). Sets campaign status to "pending-scheduled". Omit to leave as draft.',
       },
     },
     fluentcrm_pause_campaign: {
@@ -109,6 +132,13 @@ export const locale: Locale = {
     fluentcrm_delete_campaign: {
       description: 'Deletes a campaign',
       params: { campaignId: 'Campaign ID' },
+    },
+    fluentcrm_add_contacts_to_campaign: {
+      description: 'Adds specific contacts (by subscriber ID) to an existing campaign as recipients',
+      params: {
+        campaignId:  'ID of the campaign to update',
+        contact_ids: 'Array of subscriber IDs to add as recipients (replaces any existing advanced_filters)',
+      },
     },
 
     // EMAIL TEMPLATES
@@ -154,6 +184,10 @@ export const locale: Locale = {
     },
     fluentcrm_get_funnel_report: {
       description: 'Retrieves performance report for a funnel',
+      params: { funnelId: 'Funnel ID' },
+    },
+    fluentcrm_get_funnel_sequences: {
+      description: 'Retrieves all steps (sequences/actions) in a funnel automation. Returns each step with its type, action name, settings, and any conditional branches.',
       params: { funnelId: 'Funnel ID' },
     },
 

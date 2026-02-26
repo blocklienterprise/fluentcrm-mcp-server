@@ -86,16 +86,39 @@ export const locale: Locale = {
     },
 
     // KAMPANIE
+    fluentcrm_list_dynamic_segments: {
+      description: 'Listuje wszystkie dostępne segmenty dynamiczne na tej stronie (np. WordPress Users, WooCommerce Customers). Zwraca slug, tytuł i opis każdego segmentu.',
+    },
     fluentcrm_list_campaigns: {
       description: 'Pobiera listę kampanii email',
     },
     fluentcrm_create_campaign: {
       description: 'Tworzy nową kampanię email',
       params: {
-        title: 'Tytuł kampanii',
-        subject: 'Temat emaila',
-        template_id: 'ID szablonu',
-        recipient_list: 'ID list',
+        title:            'Tytuł kampanii',
+        subject:          'Temat emaila',
+        template_id:      'ID szablonu do zaimportowania jako treść',
+        recipient_list:   'Tablica ID list odbiorców',
+        email_pre_header: 'Tekst podglądu wyświetlany po temacie w skrzynkach',
+        subjects:         'Tematy A/B: [{subject, ratio}] — ratio to priorytet %',
+        from_name:        'Niestandardowa nazwa nadawcy',
+        from_email:       'Niestandardowy adres email nadawcy',
+        reply_to_name:    'Nazwa dla odpowiedzi',
+        reply_to_email:   'Adres email dla odpowiedzi',
+        utm_source:       'Źródło UTM (np. newsletter) — WYMAGANE gdy używane jest śledzenie UTM',
+        utm_medium:       'Medium UTM (np. email) — WYMAGANE gdy używane jest śledzenie UTM',
+        utm_campaign:     'Nazwa kampanii UTM — WYMAGANE gdy używane jest śledzenie UTM',
+        utm_term:         'Termin UTM (opcjonalne)',
+        utm_content:      'Zawartość UTM (opcjonalne)',
+        tags:                 'Tablica ID tagów jako odbiorcy (tryb Lista & Tag)',
+        exclude_tags:         'Tablica ID tagów do wykluczenia z odbiorców (tylko tryb list_tag)',
+        exclude_lists:        'Tablica ID list do wykluczenia z odbiorców (tylko tryb list_tag)',
+        contact_emails:       'Tablica konkretnych adresów email odbiorców (tryb zaawansowanych filtrów)',
+        contact_ids:          'Tablica ID konkretnych subskrybentów (tryb zaawansowanych filtrów)',
+        advanced_filters:     'Surowe grupy zaawansowanych filtrów — tablica grup filtrów [{property, operator, value}] (AND w grupie, OR między grupami)',
+        dynamic_segment_slug: 'Tryb Dynamic Segment: slug segmentu. Wbudowane slugi: "wp_users", "edd_customers", "wc_customers". Użyj fluentcrm_list_dynamic_segments aby zobaczyć wszystkie opcje. Wymagane z dynamic_segment_id.',
+        dynamic_segment_id:   'Tryb Dynamic Segment: ID segmentu. Dla wbudowanych segmentów systemowych (wp_users, edd_customers, wc_customers) użyj 0. Wymagane z dynamic_segment_slug.',
+        scheduled_at:         'Zaplanuj wysyłkę: "YYYY-MM-DD HH:mm:ss" (UTC). Status zmienia się na "pending-scheduled".',
       },
     },
     fluentcrm_pause_campaign: {
@@ -109,6 +132,13 @@ export const locale: Locale = {
     fluentcrm_delete_campaign: {
       description: 'Usuwa kampanię',
       params: { campaignId: 'ID kampanii' },
+    },
+    fluentcrm_add_contacts_to_campaign: {
+      description: 'Dodaje konkretne kontakty (po ID subskrybenta) do istniejącej kampanii jako odbiorcy',
+      params: {
+        campaignId:  'ID kampanii do zaktualizowania',
+        contact_ids: 'Tablica ID subskrybentów do dodania (nadpisuje istniejące advanced_filters)',
+      },
     },
 
     // EMAIL TEMPLATES
@@ -154,6 +184,10 @@ export const locale: Locale = {
     },
     fluentcrm_get_funnel_report: {
       description: 'Pobiera raport wydajności funnela',
+      params: { funnelId: 'ID funnela' },
+    },
+    fluentcrm_get_funnel_sequences: {
+      description: 'Pobiera wszystkie kroki (sekwencje/akcje) w automatyzacji funnela. Zwraca każdy krok z typem, nazwą akcji, ustawieniami i gałęziami warunkowymi.',
       params: { funnelId: 'ID funnela' },
     },
 
