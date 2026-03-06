@@ -999,53 +999,8 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
           },
         },
       },
-      {
-        name: 'fluentcrm_create_campaign',
-        description: t('fluentcrm_create_campaign'),
-        inputSchema: {
-          type: 'object',
-          properties: {
-            title:           { type: 'string', description: t('fluentcrm_create_campaign', 'title') },
-            subject:         { type: 'string', description: t('fluentcrm_create_campaign', 'subject') },
-            template_id:     { type: 'number', description: t('fluentcrm_create_campaign', 'template_id') },
-            recipient_list:  { type: 'array',  items: { type: 'number' }, description: t('fluentcrm_create_campaign', 'recipient_list') },
-            email_pre_header: { type: 'string', description: t('fluentcrm_create_campaign', 'email_pre_header') },
-            subjects: {
-              type: 'array',
-              description: t('fluentcrm_create_campaign', 'subjects'),
-              items: {
-                type: 'object',
-                properties: {
-                  subject: { type: 'string' },
-                  ratio:   { type: 'number', description: 'Priority percentage (e.g. 50)' },
-                },
-                required: ['subject'],
-              },
-            },
-            from_name:      { type: 'string', description: t('fluentcrm_create_campaign', 'from_name') },
-            from_email:     { type: 'string', description: t('fluentcrm_create_campaign', 'from_email') },
-            reply_to_name:  { type: 'string', description: t('fluentcrm_create_campaign', 'reply_to_name') },
-            reply_to_email: { type: 'string', description: t('fluentcrm_create_campaign', 'reply_to_email') },
-            utm_source:     { type: 'string', description: t('fluentcrm_create_campaign', 'utm_source') },
-            utm_medium:     { type: 'string', description: t('fluentcrm_create_campaign', 'utm_medium') },
-            utm_campaign:   { type: 'string', description: t('fluentcrm_create_campaign', 'utm_campaign') },
-            utm_term:       { type: 'string', description: t('fluentcrm_create_campaign', 'utm_term') },
-            utm_content:    { type: 'string', description: t('fluentcrm_create_campaign', 'utm_content') },
-            // NOTE: utm_source, utm_medium, and utm_campaign are conditionally required —
-            // if ANY utm_* field is provided, all three must be present or the call will fail.
-            tags:                   { type: 'array',  items: { type: 'number' }, description: t('fluentcrm_create_campaign', 'tags') },
-            exclude_tags:           { type: 'array',  items: { type: 'number' }, description: t('fluentcrm_create_campaign', 'exclude_tags') },
-            exclude_lists:          { type: 'array',  items: { type: 'number' }, description: t('fluentcrm_create_campaign', 'exclude_lists') },
-            contact_emails:         { type: 'array',  items: { type: 'string' }, description: t('fluentcrm_create_campaign', 'contact_emails') },
-            contact_ids:            { type: 'array',  items: { type: 'number' }, description: t('fluentcrm_create_campaign', 'contact_ids') },
-            advanced_filters:       { type: 'array',  items: { type: 'array'  }, description: t('fluentcrm_create_campaign', 'advanced_filters') },
-            dynamic_segment_slug:   { type: 'string', enum: ['wp_users', 'edd_customers', 'wc_customers'], description: t('fluentcrm_create_campaign', 'dynamic_segment_slug') },
-            dynamic_segment_id:     { type: 'number', description: t('fluentcrm_create_campaign', 'dynamic_segment_id') },
-            scheduled_at:           { type: 'string', description: t('fluentcrm_create_campaign', 'scheduled_at') },
-          },
-          required: ['title', 'subject'],
-        },
-      },
+      // DISABLED: fluentcrm_create_campaign — tool removed pending schema fix for advanced_filters
+      // See: https://github.com/blocklienterprise/fluentcrm-mcp-server/issues
       {
         name: 'fluentcrm_pause_campaign',
         description: t('fluentcrm_pause_campaign'),
@@ -1433,8 +1388,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         return { content: [{ type: 'text', text: JSON.stringify(await client.listDynamicSegments(), null, 2) }] };
       case 'fluentcrm_list_campaigns':
         return { content: [{ type: 'text', text: JSON.stringify(await client.listCampaigns(args || {}), null, 2) }] };
-      case 'fluentcrm_create_campaign':
-        return { content: [{ type: 'text', text: JSON.stringify(await client.createCampaign(args as any), null, 2) }] };
+      // case 'fluentcrm_create_campaign': disabled — see tool definition comment
       case 'fluentcrm_pause_campaign':
         return { content: [{ type: 'text', text: JSON.stringify(await client.pauseCampaign((args as any)?.campaignId), null, 2) }] };
       case 'fluentcrm_resume_campaign':
