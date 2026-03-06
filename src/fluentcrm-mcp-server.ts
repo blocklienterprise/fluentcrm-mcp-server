@@ -39,6 +39,7 @@ class FluentCRMClient {
         'Authorization': `Basic ${credentials}`,
         'Content-Type': 'application/json',
         'Accept': 'application/json',
+        'ngrok-skip-browser-warning': 'true',
       },
       timeout: 180000, // 3 minutes — accommodates Render cold-start + API latency
     });
