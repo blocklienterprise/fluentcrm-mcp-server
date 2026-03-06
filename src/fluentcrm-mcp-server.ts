@@ -1038,7 +1038,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
             exclude_lists:          { type: 'array',  items: { type: 'number' }, description: t('fluentcrm_create_campaign', 'exclude_lists') },
             contact_emails:         { type: 'array',  items: { type: 'string' }, description: t('fluentcrm_create_campaign', 'contact_emails') },
             contact_ids:            { type: 'array',  items: { type: 'number' }, description: t('fluentcrm_create_campaign', 'contact_ids') },
-            advanced_filters:       { type: 'array',  items: { type: 'array'  }, description: t('fluentcrm_create_campaign', 'advanced_filters') },
+            advanced_filters:       { type: 'array',  items: { type: 'array', items: { type: 'object' } }, description: t('fluentcrm_create_campaign', 'advanced_filters') },
             dynamic_segment_slug:   { type: 'string', enum: ['wp_users', 'edd_customers', 'wc_customers'], description: t('fluentcrm_create_campaign', 'dynamic_segment_slug') },
             dynamic_segment_id:     { type: 'number', description: t('fluentcrm_create_campaign', 'dynamic_segment_id') },
             scheduled_at:           { type: 'string', description: t('fluentcrm_create_campaign', 'scheduled_at') },
