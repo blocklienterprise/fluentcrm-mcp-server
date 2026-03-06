@@ -1,0 +1,1426 @@
+#!/usr/bin/env node
+import { Server } from '@modelcontextprotocol/sdk/server/index.js';
+import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
+import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
+import { CallToolRequestSchema, ListToolsRequestSchema, } from '@modelcontextprotocol/sdk/types.js';
+import axios from 'axios';
+import * as dotenv from 'dotenv';
+import { createServer } from 'http';
+import { t } from './i18n.js';
+import { randomUUID } from 'crypto';
+dotenv.config();
+const FLUENTCRM_API_URL = process.env.FLUENTCRM_API_URL || 'https://your-domain.com/wp-json/fluent-crm/v2';
+const FLUENTCRM_API_USERNAME = process.env.FLUENTCRM_API_USERNAME || '';
+const FLUENTCRM_API_PASSWORD = process.env.FLUENTCRM_API_PASSWORD || '';
+/**
+ * FluentCRM API Client
+ * Based on: https://rest-api.fluentcrm.com/#introduction
+ */
+class FluentCRMClient {
+    apiClient;
+    baseURL;
+    constructor(baseURL, username, password) {
+        this.baseURL = baseURL;
+        // Basic Auth dla FluentCRM API
+        const credentials = Buffer.from(`${username}:${password}`).toString('base64');
+        this.apiClient = axios.create({
+            baseURL,
+            headers: {
+                'Authorization': `Basic ${credentials}`,
+                'Content-Type': 'application/json',
+                'Accept': 'application/json',
+                'ngrok-skip-browser-warning': 'true',
+            },
+            timeout: 180000, // 3 minutes — accommodates Render cold-start + API latency
+        });
+        // Error interceptor
+        this.apiClient.interceptors.response.use(response => response, error => {
+            const data = error.response?.data;
+            console.error('[FluentCRM] API error response body:', JSON.stringify(data));
+            const message = data?.message || error.message;
+            const detail = data && Object.keys(data).length > 0
+                ? ` Full response: ${JSON.stringify(data)}`
+                : '';
+            const err = new Error(`FluentCRM API Error: ${message}${detail}`);
+            err.httpStatus = error.response?.status;
+            err.responseData = data;
+            throw err;
+        });
+    }
+    // ===== SUBSCRIBERS / KONTAKTY =====
+    async listContacts(params = {}) {
+        const response = await this.apiClient.get('/subscribers', { params });
+        return response.data;
+    }
+    async getContact(subscriberId) {
+        const response = await this.apiClient.get(`/subscribers/${subscriberId}`);
+        return response.data;
+    }
+    async findContactByEmail(email) {
+        const response = await this.apiClient.get('/subscribers', {
+            params: { search: email },
+        });
+        return response.data?.subscribers?.data?.[0] || null;
+    }
+    async createContact(data) {
+        const payload = { status: 'subscribed', ...data };
+        const response = await this.apiClient.post('/subscribers', payload);
+        return response.data;
+    }
+    async updateContact(subscriberId, data) {
+        const response = await this.apiClient.put(`/subscribers/${subscriberId}`, data);
+        return response.data;
+    }
+    async deleteContact(subscriberId) {
+        const response = await this.apiClient.delete(`/subscribers/${subscriberId}`);
+        return response.data;
+    }
+    // ===== TAGI =====
+    async listTags(params = {}) {
+        const response = await this.apiClient.get('/tags', { params });
+        return response.data;
+    }
+    async getTag(tagId) {
+        const response = await this.apiClient.get(`/tags/${tagId}`);
+        return response.data;
+    }
+    async createTag(data) {
+        const response = await this.apiClient.post('/tags', data);
+        return response.data;
+    }
+    async updateTag(tagId, data) {
+        const response = await this.apiClient.put(`/tags/${tagId}`, data);
+        return response.data;
+    }
+    async deleteTag(tagId) {
+        const response = await this.apiClient.delete(`/tags/${tagId}`);
+        return response.data;
+    }
+    async attachTagToContact(subscriberId, tagIds) {
+        const response = await this.apiClient.post(`/subscribers/${subscriberId}/tags`, { tags: tagIds });
+        return response.data;
+    }
+    async detachTagFromContact(subscriberId, tagIds) {
+        const response = await this.apiClient.post(`/subscribers/${subscriberId}/tags/detach`, { tags: tagIds });
+        return response.data;
+    }
+    // ===== LISTY =====
+    async listLists(params = {}) {
+        const response = await this.apiClient.get('/lists', { params });
+        return response.data;
+    }
+    async getList(listId) {
+        const response = await this.apiClient.get(`/lists/${listId}`);
+        return response.data;
+    }
+    async createList(data) {
+        const response = await this.apiClient.post('/lists', data);
+        return response.data;
+    }
+    async updateList(listId, data) {
+        const response = await this.apiClient.put(`/lists/${listId}`, data);
+        return response.data;
+    }
+    async deleteList(listId) {
+        const response = await this.apiClient.delete(`/lists/${listId}`);
+        return response.data;
+    }
+    async attachContactToList(subscriberId, listIds) {
+        const response = await this.apiClient.post(`/subscribers/${subscriberId}/lists`, { lists: listIds });
+        return response.data;
+    }
+    async detachContactFromList(subscriberId, listIds) {
+        const response = await this.apiClient.post(`/subscribers/${subscriberId}/lists/detach`, { lists: listIds });
+        return response.data;
+    }
+    // ===== KAMPANIE =====
+    async listCampaigns(params = {}) {
+        const response = await this.apiClient.get('/campaigns', { params });
+        return response.data;
+    }
+    async listDynamicSegments() {
+        // Fetches all available dynamic segments registered on this site.
+        // System segments (wp_users, edd_customers, wc_customers) have id=0.
+        const response = await this.apiClient.get('/reports/options', { params: { fields: 'segments' } });
+        return response.data?.options?.segments ?? [];
+    }
+    async getCampaign(campaignId) {
+        const response = await this.apiClient.get(`/campaigns/${campaignId}`);
+        return response.data;
+    }
+    async createCampaign(data) {
+        // Validate: if any UTM field is supplied, source/medium/campaign are all required
+        const anyUtm = ['utm_source', 'utm_medium', 'utm_campaign', 'utm_term', 'utm_content'].some(f => data[f]);
+        if (anyUtm) {
+            const missingUtm = ['utm_source', 'utm_medium', 'utm_campaign'].filter(f => !data[f]);
+            if (missingUtm.length > 0) {
+                return {
+                    success: false,
+                    reason: 'validation_error',
+                    message: `utm_source, utm_medium, and utm_campaign are all required when using UTM tracking. Missing: ${missingUtm.join(', ')}`,
+                };
+            }
+        }
+        // FluentCRM's POST /campaigns only accepts 'title' — all other fields
+        // (email_subject, template_id, email_body, etc.) must be applied via a follow-up PUT.
+        const createResponse = await this.apiClient.post('/campaigns', { title: data.title });
+        const campaign = createResponse.data;
+        const campaignId = campaign?.id;
+        const extraFields = {};
+        if (data.subject || data.email_subject)
+            extraFields.email_subject = data.subject ?? data.email_subject;
+        if (data.template_id)
+            extraFields.template_id = data.template_id;
+        if (data.email_pre_header)
+            extraFields.email_pre_header = data.email_pre_header;
+        if (data.design_template)
+            extraFields.design_template = data.design_template;
+        // NOTE: lists/tags/contact_emails/contact_ids are NOT sent via PUT.
+        // FluentCRM ignores them on PUT — recipients must be set via POST /draft-recipients.
+        // We build the draftRecipientsPayload below and call it after the PUT.
+        // scheduled_at is applied via POST /campaigns/{id}/schedule after the PUT,
+        // because FluentCRM ignores status='scheduled' in PUT requests.
+        // Store it separately — do NOT put it in extraFields for the PUT.
+        const scheduledAt = data.scheduled_at || undefined;
+        // UTM tracking
+        const utmFields = ['utm_source', 'utm_medium', 'utm_campaign', 'utm_term', 'utm_content'];
+        for (const f of utmFields) {
+            if (data[f])
+                extraFields[f] = data[f];
+        }
+        if (utmFields.some(f => data[f]))
+            extraFields.utm_status = '1';
+        // Build settings object: merge custom mailer settings + any user-supplied settings
+        const baseSettings = data.settings ? { ...data.settings } : {};
+        const hasMailer = data.from_name || data.from_email || data.reply_to_name || data.reply_to_email;
+        if (hasMailer) {
+            baseSettings.mailer_settings = {
+                from_name: data.from_name ?? '',
+                from_email: data.from_email ?? '',
+                reply_to_name: data.reply_to_name ?? '',
+                reply_to_email: data.reply_to_email ?? '',
+                is_custom: 'yes',
+            };
+        }
+        if (Object.keys(baseSettings).length > 0)
+            extraFields.settings = baseSettings;
+        // Build draft-recipients payload (applied after PUT via POST /draft-recipients).
+        // FluentCRM supports three sending_filter modes:
+        //   list_tag:          {sending_filter:'list_tag', subscribers:[{list:'all'|id, tag:'all'|id}],
+        //                       excludedSubscribers:[{list,tag}]}   ← exclusions only work in this mode
+        //   dynamic_segment:   {sending_filter:'dynamic_segment', dynamic_segment:{slug,id}}
+        //   advanced_filters:  {sending_filter:'advanced_filters', advanced_filters:[[{property,operator,value}]]}
+        let draftRecipientsPayload = null;
+        const tagIds = Array.isArray(data.tags) ? data.tags : [];
+        const listIds = Array.isArray(data.recipient_list ?? data.lists)
+            ? (data.recipient_list ?? data.lists) : [];
+        const contactIds = Array.isArray(data.contact_ids) ? data.contact_ids : [];
+        const contactEmails = Array.isArray(data.contact_emails) ? data.contact_emails : [];
+        const excludeTagIds = Array.isArray(data.exclude_tags) ? data.exclude_tags : [];
+        const excludeListIds = Array.isArray(data.exclude_lists) ? data.exclude_lists : [];
+        if (Array.isArray(data.advanced_filters) && data.advanced_filters.length > 0) {
+            // User-supplied raw advanced_filters groups — full By Advanced Filter mode
+            draftRecipientsPayload = { sending_filter: 'advanced_filters', advanced_filters: data.advanced_filters };
+        }
+        else if (contactIds.length > 0 || contactEmails.length > 0) {
+            // advanced_filters mode — built from contact_ids / contact_emails
+            // FluentCRM's ContactsQuery.formatAdvancedFilters() requires source:[provider, property]
+            const filterGroups = [];
+            if (contactIds.length > 0)
+                filterGroups.push([{ source: ['subscriber', 'id'], operator: 'in', value: contactIds }]);
+            if (contactEmails.length > 0)
+                filterGroups.push([{ source: ['subscriber', 'email'], operator: 'in', value: contactEmails }]);
+            draftRecipientsPayload = { sending_filter: 'advanced_filters', advanced_filters: filterGroups };
+        }
+        else if (data.dynamic_segment_slug && data.dynamic_segment_id) {
+            // Dynamic segment targeting (e.g. slug:'tag', id:3  or  slug:'woo_customer', id:X)
+            draftRecipientsPayload = {
+                sending_filter: 'dynamic_segment',
+                dynamic_segment: { slug: data.dynamic_segment_slug, id: data.dynamic_segment_id },
+            };
+        }
+        else if (tagIds.length > 0 || listIds.length > 0) {
+            // list_tag mode: {list:'all', tag:id} targets by tag; {list:id, tag:'all'} targets by list
+            const subscribers = [
+                ...tagIds.map(t => ({ list: 'all', tag: t })),
+                ...listIds.map(l => ({ list: l, tag: 'all' })),
+            ];
+            draftRecipientsPayload = { sending_filter: 'list_tag', subscribers };
+            // Excluded contacts: same {list,tag} shape — subtracted from included set
+            if (excludeTagIds.length > 0 || excludeListIds.length > 0) {
+                draftRecipientsPayload.excludedSubscribers = [
+                    ...excludeTagIds.map(t => ({ list: 'all', tag: t })),
+                    ...excludeListIds.map(l => ({ list: l, tag: 'all' })),
+                ];
+            }
+        }
+        // A/B test subjects — API uses {key: ratio, value: subject_text}
+        if (Array.isArray(data.subjects) && data.subjects.length > 0) {
+            extraFields.update_subjects = true;
+            extraFields.subjects = data.subjects.map((s) => ({
+                value: s.subject ?? s.value,
+                key: s.ratio ?? s.key ?? 50,
+            }));
+        }
+        // If a template_id is given but no email_body, fetch the template's post_content
+        // so the campaign body is pre-populated (mirrors the UI "Import Template" behaviour).
+        if (data.template_id && !data.email_body) {
+            try {
+                const tplResponse = await this.apiClient.get(`/templates/${data.template_id}`);
+                const tpl = tplResponse.data?.template ?? tplResponse.data;
+                if (tpl?.post_content) {
+                    extraFields.email_body = tpl.post_content;
+                }
+                if (tpl?.design_template && !data.design_template) {
+                    extraFields.design_template = tpl.design_template;
+                }
+            }
+            catch (_) {
+                // template fetch failed — proceed without body
+            }
+        }
+        else if (data.email_body) {
+            extraFields.email_body = data.email_body;
+        }
+        let finalCampaign = campaign;
+        if (campaignId && Object.keys(extraFields).length > 0) {
+            const updateResponse = await this.apiClient.put(`/campaigns/${campaignId}`, {
+                title: data.title, // required by update validator
+                ...extraFields,
+            });
+            finalCampaign = updateResponse.data?.campaign ?? updateResponse.data;
+        }
+        // Apply recipient targeting via /draft-recipients (tags, lists, contact_ids, contact_emails).
+        // This must happen AFTER the PUT so the campaign exists and settings are saved.
+        if (campaignId && draftRecipientsPayload) {
+            try {
+                const drResponse = await this.apiClient.post(`/campaigns/${campaignId}/draft-recipients`, draftRecipientsPayload);
+                // draft-recipients returns {message, count} — merge count into finalCampaign
+                if (drResponse.data?.count !== undefined) {
+                    finalCampaign = { ...finalCampaign, recipients_count: drResponse.data.count };
+                }
+            }
+            catch (drErr) {
+                const errMsg = drErr?.responseData?.message ?? drErr?.message ?? 'unknown error';
+                finalCampaign = { ...finalCampaign, _recipients_warning: `Recipient targeting failed: ${errMsg}` };
+            }
+        }
+        // Scheduling: must call POST /campaigns/{id}/schedule to set status=pending-scheduled.
+        // PUT /campaigns/{id} ignores any status field, so this must be a separate request.
+        if (campaignId && scheduledAt) {
+            try {
+                const schedResponse = await this.apiClient.post(`/campaigns/${campaignId}/schedule`, {
+                    scheduled_at: scheduledAt,
+                });
+                finalCampaign = schedResponse.data?.campaign ?? schedResponse.data ?? finalCampaign;
+            }
+            catch (schedErr) {
+                // Schedule call failed — return campaign as draft and surface a warning
+                const errMsg = schedErr?.responseData?.message ?? schedErr?.message ?? 'unknown error';
+                return {
+                    ...finalCampaign,
+                    _schedule_warning: `Campaign created but scheduling failed: ${errMsg}`,
+                };
+            }
+        }
+        return finalCampaign;
+    }
+    async updateCampaign(campaignId, data) {
+        const response = await this.apiClient.put(`/campaigns/${campaignId}`, data);
+        return response.data;
+    }
+    async pauseCampaign(campaignId) {
+        const response = await this.apiClient.post(`/campaigns/${campaignId}/pause`);
+        return response.data;
+    }
+    async resumeCampaign(campaignId) {
+        const response = await this.apiClient.post(`/campaigns/${campaignId}/resume`);
+        return response.data;
+    }
+    async deleteCampaign(campaignId) {
+        const response = await this.apiClient.delete(`/campaigns/${campaignId}`);
+        return response.data;
+    }
+    async addContactsToCampaign(campaignId, contactIds) {
+        // Use /draft-recipients with advanced_filters to target specific subscriber IDs.
+        // This is the correct FluentCRM API pattern — PUT /campaigns/{id} ignores recipient settings.
+        const response = await this.apiClient.post(`/campaigns/${campaignId}/draft-recipients`, {
+            sending_filter: 'advanced_filters',
+            advanced_filters: [[{ source: ['subscriber', 'id'], operator: 'in', value: contactIds }]],
+        });
+        return response.data;
+    }
+    // ===== EMAIL TEMPLATES =====
+    async listEmailTemplates(params = {}) {
+        const response = await this.apiClient.get('/templates', { params });
+        return response.data;
+    }
+    async getEmailTemplate(templateId) {
+        const response = await this.apiClient.get(`/templates/${templateId}`);
+        return response.data;
+    }
+    async createEmailTemplate(data) {
+        // FluentCRM API expects: { template: { post_title, post_content, email_subject, edit_type, design_template } }
+        const payload = {
+            template: {
+                post_title: data.title || data.post_title || '',
+                post_content: data.body || data.post_content || '',
+                email_subject: data.subject || data.email_subject || '',
+                edit_type: data.edit_type || 'html',
+                design_template: data.design_template || 'raw_html',
+            },
+        };
+        const response = await this.apiClient.post('/templates', payload);
+        return response.data;
+    }
+    async updateEmailTemplate(templateId, data) {
+        const payload = data.template ? data : {
+            template: {
+                post_title: data.title || data.post_title,
+                post_content: data.body || data.post_content,
+                email_subject: data.subject || data.email_subject,
+                edit_type: data.edit_type || 'html',
+                design_template: data.design_template || 'raw_html',
+            },
+        };
+        const response = await this.apiClient.put(`/templates/${templateId}`, payload);
+        return response.data;
+    }
+    async deleteEmailTemplate(templateId) {
+        const response = await this.apiClient.delete(`/templates/${templateId}`);
+        return response.data;
+    }
+    // ===== AUTOMATION FUNNELS =====
+    async listAutomations(params = {}) {
+        const response = await this.apiClient.get('/funnels', { params });
+        return response.data;
+    }
+    async getAutomation(funnelId) {
+        const response = await this.apiClient.get(`/funnels/${funnelId}`);
+        return response.data;
+    }
+    async createAutomation(data) {
+        const response = await this.apiClient.post('/funnels', data);
+        return response.data;
+    }
+    async updateAutomation(funnelId, data) {
+        const response = await this.apiClient.put(`/funnels/${funnelId}`, data);
+        return response.data;
+    }
+    async deleteAutomation(funnelId) {
+        const response = await this.apiClient.delete(`/funnels/${funnelId}`);
+        return response.data;
+    }
+    async updateFunnelStatus(funnelId, status) {
+        const response = await this.apiClient.put(`/funnels/${funnelId}/status`, { status });
+        return response.data;
+    }
+    async duplicateFunnel(funnelId) {
+        const response = await this.apiClient.post(`/funnels/${funnelId}/clone`);
+        return response.data;
+    }
+    async getFunnelSubscribers(funnelId, params = {}) {
+        const response = await this.apiClient.get(`/funnels/${funnelId}/subscribers`, { params });
+        return response.data;
+    }
+    async updateFunnelSubscriberStatus(funnelId, subscriberId, status) {
+        const response = await this.apiClient.put(`/funnels/${funnelId}/subscribers/${subscriberId}/status`, { status });
+        return response.data;
+    }
+    async removeFunnelSubscribers(funnelId, subscriberIds) {
+        const response = await this.apiClient.delete(`/funnels/${funnelId}/subscribers`, { data: { subscriber_ids: subscriberIds } });
+        return response.data;
+    }
+    async addSubscribersToFunnel(funnelId, subscriberIds) {
+        const response = await this.apiClient.post('/subscribers/do-bulk-action', {
+            action_name: 'add_to_automation',
+            subscriber_ids: subscriberIds,
+            new_status: funnelId,
+        });
+        return response.data;
+    }
+    async getFunnelReport(funnelId) {
+        const response = await this.apiClient.get(`/funnels/${funnelId}/report`);
+        return response.data;
+    }
+    async getFunnelSequences(funnelId) {
+        const response = await this.apiClient.get(`/funnels/${funnelId}`, {
+            params: { 'with[]': 'funnel_sequences' },
+        });
+        return response.data?.funnel_sequences ?? [];
+    }
+    // ===== WEBHOOKS =====
+    async listWebhooks(params = {}) {
+        const response = await this.apiClient.get('/webhooks', { params });
+        return response.data;
+    }
+    async createWebhook(data) {
+        const response = await this.apiClient.post('/webhooks', data);
+        return response.data;
+    }
+    async updateWebhook(webhookId, data) {
+        const response = await this.apiClient.put(`/webhook/${webhookId}`, data);
+        return response.data;
+    }
+    async deleteWebhook(webhookId) {
+        const response = await this.apiClient.delete(`/webhook/${webhookId}`);
+        return response.data;
+    }
+    // ===== CUSTOM FIELDS =====
+    async listCustomFields() {
+        const response = await this.apiClient.get('/custom-fields');
+        return response.data;
+    }
+    // ===== SMART LINKS =====
+    // Note: FluentCRM doesn't have native REST API for Smart Links yet
+    // These methods prepare for future API or work with existing endpoints
+    async listSmartLinks(params = {}) {
+        try {
+            const response = await this.apiClient.get('/smart-links', { params });
+            // FluentCRM Pro returns {action_links: [...]} (paginated)
+            return response.data;
+        }
+        catch (error) {
+            const status = error.httpStatus;
+            const data = error.responseData;
+            if (status === 404) {
+                return { success: false, reason: 'endpoint_not_found', message: 'Smart Links API endpoint not available in this FluentCRM version.', suggestion: 'Upgrade FluentCRM or manage Smart Links in the admin panel.' };
+            }
+            if (status === 422 && data?.status === 'disabled') {
+                return { success: false, reason: 'feature_disabled', message: 'Smart Links feature is disabled in FluentCRM.', suggestion: 'Enable Smart Links in FluentCRM → Settings → Smart Links, then retry.' };
+            }
+            if (status === 500) {
+                return { success: false, reason: 'server_error', message: 'FluentCRM returned a 500 error while listing Smart Links. This often means the Smart Links module is not fully active.', suggestion: 'Enable Smart Links in FluentCRM → Settings → Smart Links, then retry.', raw: data };
+            }
+            throw error;
+        }
+    }
+    async getSmartLink(smartLinkId) {
+        try {
+            // FluentCRM Pro has no GET /smart-links/{id} endpoint — simulate by fetching list and filtering
+            const response = await this.apiClient.get('/smart-links');
+            const links = response.data?.action_links?.data ?? response.data?.action_links ?? [];
+            const found = links.find((l) => l.id === smartLinkId);
+            if (!found) {
+                return { success: false, reason: 'not_found', message: `Smart Link ${smartLinkId} not found.` };
+            }
+            return found;
+        }
+        catch (error) {
+            const status = error.httpStatus;
+            const data = error.responseData;
+            if (status === 422 && data?.status === 'disabled') {
+                return { success: false, reason: 'feature_disabled', message: 'Smart Links feature is disabled in FluentCRM.', suggestion: 'Enable Smart Links in FluentCRM → Settings → Smart Links, then retry.' };
+            }
+            if (status === 500) {
+                return { success: false, reason: 'server_error', message: 'FluentCRM returned a 500 error. Smart Links module may not be fully active.', suggestion: 'Enable Smart Links in FluentCRM → Settings → Smart Links, then retry.', raw: data };
+            }
+            throw error;
+        }
+    }
+    async createSmartLink(data) {
+        try {
+            // FluentCRM Pro requires the payload wrapped in a 'link' key
+            const payload = {
+                link: {
+                    title: data.title,
+                    slug: data.slug,
+                    target_url: data.target_url,
+                    auto_login: data.auto_login ? 'yes' : 'no',
+                    actions: {
+                        apply_tags: data.apply_tags ?? [],
+                        apply_lists: data.apply_lists ?? [],
+                    },
+                    detach_actions: {
+                        tags: data.remove_tags ?? [],
+                        lists: data.remove_lists ?? [],
+                    },
+                }
+            };
+            const response = await this.apiClient.post('/smart-links', payload);
+            return response.data;
+        }
+        catch (error) {
+            const status = error.httpStatus;
+            const resData = error.responseData;
+            if (status === 404) {
+                return { success: false, reason: 'endpoint_not_found', message: 'Smart Links API endpoint not available in this FluentCRM version.', recommended_data: data };
+            }
+            if (status === 422 && resData?.status === 'disabled') {
+                return { success: false, reason: 'feature_disabled', message: 'Smart Links feature is disabled in FluentCRM.', suggestion: 'Enable Smart Links in FluentCRM → Settings → Smart Links, then retry.', requested_data: data };
+            }
+            if (status === 500) {
+                return { success: false, reason: 'server_error', message: 'FluentCRM returned a 500 error while creating the Smart Link. The Smart Links module may not be fully active.', suggestion: 'Enable Smart Links in FluentCRM → Settings → Smart Links, then retry.', raw: resData, requested_data: data };
+            }
+            throw error;
+        }
+    }
+    async updateSmartLink(smartLinkId, data) {
+        try {
+            // FluentCRM Pro requires the payload wrapped in a 'link' key
+            const payload = { link: data };
+            const response = await this.apiClient.put(`/smart-links/${smartLinkId}`, payload);
+            return response.data;
+        }
+        catch (error) {
+            const status = error.httpStatus;
+            const resData = error.responseData;
+            if (status === 404) {
+                return { success: false, reason: 'not_found', message: `Smart Link ${smartLinkId} not found.` };
+            }
+            if (status === 422 && resData?.status === 'disabled') {
+                return { success: false, reason: 'feature_disabled', message: 'Smart Links feature is disabled in FluentCRM.', suggestion: 'Enable Smart Links in FluentCRM → Settings → Smart Links, then retry.' };
+            }
+            if (status === 500) {
+                return { success: false, reason: 'server_error', message: 'FluentCRM returned a 500 error while updating the Smart Link.', suggestion: 'Enable Smart Links in FluentCRM → Settings → Smart Links, then retry.', raw: resData };
+            }
+            throw error;
+        }
+    }
+    async deleteSmartLink(smartLinkId) {
+        try {
+            const response = await this.apiClient.delete(`/smart-links/${smartLinkId}`);
+            return response.data;
+        }
+        catch (error) {
+            const status = error.httpStatus;
+            const resData = error.responseData;
+            if (status === 404) {
+                return { success: false, reason: 'not_found', message: `Smart Link ${smartLinkId} not found.` };
+            }
+            if (status === 422 && resData?.status === 'disabled') {
+                return { success: false, reason: 'feature_disabled', message: 'Smart Links feature is disabled in FluentCRM.', suggestion: 'Enable Smart Links in FluentCRM → Settings → Smart Links, then retry.' };
+            }
+            if (status === 500) {
+                return { success: false, reason: 'server_error', message: 'FluentCRM returned a 500 error while deleting the Smart Link.', suggestion: 'Enable Smart Links in FluentCRM → Settings → Smart Links, then retry.', raw: resData };
+            }
+            throw error;
+        }
+    }
+    // Helper method to generate Smart Link shortcode
+    generateSmartLinkShortcode(slug, linkText) {
+        if (linkText) {
+            return `<a href="{{fc_smart_link slug='${slug}'}}">${linkText}</a>`;
+        }
+        return `{{fc_smart_link slug='${slug}'}}`;
+    }
+    // Helper method to validate Smart Link data
+    validateSmartLinkData(data) {
+        const errors = [];
+        if (!data.title || typeof data.title !== 'string') {
+            errors.push('Title is required and must be a string');
+        }
+        if (!data.target_url || typeof data.target_url !== 'string') {
+            errors.push('Target URL is required and must be a string');
+        }
+        if (data.target_url && !data.target_url.startsWith('http')) {
+            errors.push('Target URL must start with http:// or https://');
+        }
+        if (data.slug && !/^[a-z0-9-]+$/.test(data.slug)) {
+            errors.push('Slug must contain only lowercase letters, numbers, and hyphens');
+        }
+        return {
+            valid: errors.length === 0,
+            errors
+        };
+    }
+    // ===== REPORTS =====
+    async getDashboardStats() {
+        const response = await this.apiClient.get('/reports/dashboard-stats');
+        return response.data;
+    }
+    async getSubscribersGrowthRate(params = {}) {
+        const response = await this.apiClient.get('/reports/subscribers-growth-rate', { params });
+        return response.data;
+    }
+}
+// ===== MCP SERVER SETUP =====
+function createMcpServer(client) {
+    const server = new Server({
+        name: 'fluentcrm-mcp',
+        version: '1.0.0',
+    }, {
+        capabilities: {
+            tools: {},
+        },
+    });
+    server.setRequestHandler(ListToolsRequestSchema, async () => {
+        return {
+            tools: [
+                // ===== CONTACTS =====
+                {
+                    name: 'fluentcrm_list_contacts',
+                    description: t('fluentcrm_list_contacts'),
+                    inputSchema: {
+                        type: 'object',
+                        properties: {
+                            page: { type: 'number', description: t('fluentcrm_list_contacts', 'page') },
+                            per_page: { type: 'number', description: t('fluentcrm_list_contacts', 'per_page') },
+                            search: { type: 'string', description: t('fluentcrm_list_contacts', 'search') },
+                        },
+                    },
+                },
+                {
+                    name: 'fluentcrm_get_contact',
+                    description: t('fluentcrm_get_contact'),
+                    inputSchema: {
+                        type: 'object',
+                        properties: {
+                            subscriberId: { type: 'number', description: t('fluentcrm_get_contact', 'subscriberId') },
+                        },
+                        required: ['subscriberId'],
+                    },
+                },
+                {
+                    name: 'fluentcrm_find_contact_by_email',
+                    description: t('fluentcrm_find_contact_by_email'),
+                    inputSchema: {
+                        type: 'object',
+                        properties: {
+                            email: { type: 'string', description: t('fluentcrm_find_contact_by_email', 'email') },
+                        },
+                        required: ['email'],
+                    },
+                },
+                {
+                    name: 'fluentcrm_create_contact',
+                    description: t('fluentcrm_create_contact'),
+                    inputSchema: {
+                        type: 'object',
+                        properties: {
+                            email: { type: 'string', description: t('fluentcrm_create_contact', 'email') },
+                            first_name: { type: 'string', description: t('fluentcrm_create_contact', 'first_name') },
+                            last_name: { type: 'string', description: t('fluentcrm_create_contact', 'last_name') },
+                            phone: { type: 'string', description: t('fluentcrm_create_contact', 'phone') },
+                            address_line_1: { type: 'string', description: t('fluentcrm_create_contact', 'address_line_1') },
+                            city: { type: 'string', description: t('fluentcrm_create_contact', 'city') },
+                            country: { type: 'string', description: t('fluentcrm_create_contact', 'country') },
+                            status: { type: 'string', description: 'Contact status: subscribed, pending, unsubscribed, bounced. Defaults to subscribed.' },
+                        },
+                        required: ['email'],
+                    },
+                },
+                {
+                    name: 'fluentcrm_update_contact',
+                    description: t('fluentcrm_update_contact'),
+                    inputSchema: {
+                        type: 'object',
+                        properties: {
+                            subscriberId: { type: 'number', description: t('fluentcrm_update_contact', 'subscriberId') },
+                            first_name: { type: 'string' },
+                            last_name: { type: 'string' },
+                            phone: { type: 'string' },
+                        },
+                        required: ['subscriberId'],
+                    },
+                },
+                {
+                    name: 'fluentcrm_delete_contact',
+                    description: t('fluentcrm_delete_contact'),
+                    inputSchema: {
+                        type: 'object',
+                        properties: {
+                            subscriberId: { type: 'number', description: t('fluentcrm_delete_contact', 'subscriberId') },
+                        },
+                        required: ['subscriberId'],
+                    },
+                },
+                // ===== TAGS =====
+                {
+                    name: 'fluentcrm_list_tags',
+                    description: t('fluentcrm_list_tags'),
+                    inputSchema: {
+                        type: 'object',
+                        properties: {
+                            page: { type: 'number', description: t('fluentcrm_list_tags', 'page') },
+                            search: { type: 'string', description: t('fluentcrm_list_tags', 'search') },
+                        },
+                    },
+                },
+                {
+                    name: 'fluentcrm_create_tag',
+                    description: t('fluentcrm_create_tag'),
+                    inputSchema: {
+                        type: 'object',
+                        properties: {
+                            title: { type: 'string', description: t('fluentcrm_create_tag', 'title') },
+                            slug: { type: 'string', description: t('fluentcrm_create_tag', 'slug') },
+                            description: { type: 'string', description: t('fluentcrm_create_tag', 'description') },
+                        },
+                        required: ['title'],
+                    },
+                },
+                {
+                    name: 'fluentcrm_delete_tag',
+                    description: t('fluentcrm_delete_tag'),
+                    inputSchema: {
+                        type: 'object',
+                        properties: {
+                            tagId: { type: 'number', description: t('fluentcrm_delete_tag', 'tagId') },
+                        },
+                        required: ['tagId'],
+                    },
+                },
+                {
+                    name: 'fluentcrm_attach_tag_to_contact',
+                    description: t('fluentcrm_attach_tag_to_contact'),
+                    inputSchema: {
+                        type: 'object',
+                        properties: {
+                            subscriberId: { type: 'number', description: t('fluentcrm_attach_tag_to_contact', 'subscriberId') },
+                            tagIds: { type: 'array', items: { type: 'number' }, description: t('fluentcrm_attach_tag_to_contact', 'tagIds') },
+                        },
+                        required: ['subscriberId', 'tagIds'],
+                    },
+                },
+                {
+                    name: 'fluentcrm_detach_tag_from_contact',
+                    description: t('fluentcrm_detach_tag_from_contact'),
+                    inputSchema: {
+                        type: 'object',
+                        properties: {
+                            subscriberId: { type: 'number', description: t('fluentcrm_detach_tag_from_contact', 'subscriberId') },
+                            tagIds: { type: 'array', items: { type: 'number' }, description: t('fluentcrm_detach_tag_from_contact', 'tagIds') },
+                        },
+                        required: ['subscriberId', 'tagIds'],
+                    },
+                },
+                // ===== LISTS =====
+                {
+                    name: 'fluentcrm_list_lists',
+                    description: t('fluentcrm_list_lists'),
+                    inputSchema: {
+                        type: 'object',
+                        properties: {},
+                    },
+                },
+                {
+                    name: 'fluentcrm_create_list',
+                    description: t('fluentcrm_create_list'),
+                    inputSchema: {
+                        type: 'object',
+                        properties: {
+                            title: { type: 'string', description: t('fluentcrm_create_list', 'title') },
+                            slug: { type: 'string', description: t('fluentcrm_create_list', 'slug') },
+                            description: { type: 'string', description: t('fluentcrm_create_list', 'description') },
+                        },
+                        required: ['title'],
+                    },
+                },
+                {
+                    name: 'fluentcrm_delete_list',
+                    description: t('fluentcrm_delete_list'),
+                    inputSchema: {
+                        type: 'object',
+                        properties: {
+                            listId: { type: 'number', description: t('fluentcrm_delete_list', 'listId') },
+                        },
+                        required: ['listId'],
+                    },
+                },
+                {
+                    name: 'fluentcrm_attach_contact_to_list',
+                    description: t('fluentcrm_attach_contact_to_list'),
+                    inputSchema: {
+                        type: 'object',
+                        properties: {
+                            subscriberId: { type: 'number', description: t('fluentcrm_attach_contact_to_list', 'subscriberId') },
+                            listIds: { type: 'array', items: { type: 'number' }, description: t('fluentcrm_attach_contact_to_list', 'listIds') },
+                        },
+                        required: ['subscriberId', 'listIds'],
+                    },
+                },
+                {
+                    name: 'fluentcrm_detach_contact_from_list',
+                    description: t('fluentcrm_detach_contact_from_list'),
+                    inputSchema: {
+                        type: 'object',
+                        properties: {
+                            subscriberId: { type: 'number', description: t('fluentcrm_detach_contact_from_list', 'subscriberId') },
+                            listIds: { type: 'array', items: { type: 'number' }, description: t('fluentcrm_detach_contact_from_list', 'listIds') },
+                        },
+                        required: ['subscriberId', 'listIds'],
+                    },
+                },
+                // ===== CAMPAIGNS =====
+                {
+                    name: 'fluentcrm_list_dynamic_segments',
+                    description: t('fluentcrm_list_dynamic_segments'),
+                    inputSchema: { type: 'object', properties: {} },
+                },
+                {
+                    name: 'fluentcrm_list_campaigns',
+                    description: t('fluentcrm_list_campaigns'),
+                    inputSchema: {
+                        type: 'object',
+                        properties: {
+                            page: { type: 'number' },
+                            search: { type: 'string' },
+                        },
+                    },
+                },
+                // DISABLED: fluentcrm_create_campaign — tool removed pending schema fix for advanced_filters
+                // See: https://github.com/blocklienterprise/fluentcrm-mcp-server/issues
+                {
+                    name: 'fluentcrm_pause_campaign',
+                    description: t('fluentcrm_pause_campaign'),
+                    inputSchema: {
+                        type: 'object',
+                        properties: {
+                            campaignId: { type: 'number', description: t('fluentcrm_pause_campaign', 'campaignId') },
+                        },
+                        required: ['campaignId'],
+                    },
+                },
+                {
+                    name: 'fluentcrm_resume_campaign',
+                    description: t('fluentcrm_resume_campaign'),
+                    inputSchema: {
+                        type: 'object',
+                        properties: {
+                            campaignId: { type: 'number', description: t('fluentcrm_resume_campaign', 'campaignId') },
+                        },
+                        required: ['campaignId'],
+                    },
+                },
+                {
+                    name: 'fluentcrm_delete_campaign',
+                    description: t('fluentcrm_delete_campaign'),
+                    inputSchema: {
+                        type: 'object',
+                        properties: {
+                            campaignId: { type: 'number', description: t('fluentcrm_delete_campaign', 'campaignId') },
+                        },
+                        required: ['campaignId'],
+                    },
+                },
+                {
+                    name: 'fluentcrm_add_contacts_to_campaign',
+                    description: t('fluentcrm_add_contacts_to_campaign'),
+                    inputSchema: {
+                        type: 'object',
+                        properties: {
+                            campaignId: { type: 'number', description: t('fluentcrm_add_contacts_to_campaign', 'campaignId') },
+                            contact_ids: { type: 'array', items: { type: 'number' }, description: t('fluentcrm_add_contacts_to_campaign', 'contact_ids') },
+                        },
+                        required: ['campaignId', 'contact_ids'],
+                    },
+                },
+                // ===== EMAIL TEMPLATES =====
+                {
+                    name: 'fluentcrm_list_email_templates',
+                    description: t('fluentcrm_list_email_templates'),
+                    inputSchema: {
+                        type: 'object',
+                        properties: {},
+                    },
+                },
+                {
+                    name: 'fluentcrm_create_email_template',
+                    description: t('fluentcrm_create_email_template'),
+                    inputSchema: {
+                        type: 'object',
+                        properties: {
+                            title: { type: 'string', description: t('fluentcrm_create_email_template', 'title') },
+                            subject: { type: 'string', description: t('fluentcrm_create_email_template', 'subject') },
+                            body: { type: 'string', description: t('fluentcrm_create_email_template', 'body') },
+                        },
+                        required: ['title', 'subject', 'body'],
+                    },
+                },
+                // ===== AUTOMATIONS =====
+                {
+                    name: 'fluentcrm_list_automations',
+                    description: t('fluentcrm_list_automations'),
+                    inputSchema: {
+                        type: 'object',
+                        properties: {
+                            page: { type: 'number' },
+                            search: { type: 'string' },
+                            status: { type: 'string', enum: ['published', 'draft', 'paused'] },
+                        },
+                    },
+                },
+                {
+                    name: 'fluentcrm_get_automation',
+                    description: t('fluentcrm_get_automation'),
+                    inputSchema: {
+                        type: 'object',
+                        properties: {
+                            funnelId: { type: 'number', description: t('fluentcrm_get_automation', 'funnelId') },
+                        },
+                        required: ['funnelId'],
+                    },
+                },
+                {
+                    name: 'fluentcrm_update_funnel_status',
+                    description: t('fluentcrm_update_funnel_status'),
+                    inputSchema: {
+                        type: 'object',
+                        properties: {
+                            funnelId: { type: 'number', description: t('fluentcrm_update_funnel_status', 'funnelId') },
+                            status: { type: 'string', enum: ['published', 'draft', 'paused'], description: t('fluentcrm_update_funnel_status', 'status') },
+                        },
+                        required: ['funnelId', 'status'],
+                    },
+                },
+                {
+                    name: 'fluentcrm_duplicate_funnel',
+                    description: t('fluentcrm_duplicate_funnel'),
+                    inputSchema: {
+                        type: 'object',
+                        properties: {
+                            funnelId: { type: 'number', description: t('fluentcrm_duplicate_funnel', 'funnelId') },
+                        },
+                        required: ['funnelId'],
+                    },
+                },
+                {
+                    name: 'fluentcrm_delete_automation',
+                    description: t('fluentcrm_delete_automation'),
+                    inputSchema: {
+                        type: 'object',
+                        properties: {
+                            funnelId: { type: 'number', description: t('fluentcrm_delete_automation', 'funnelId') },
+                        },
+                        required: ['funnelId'],
+                    },
+                },
+                {
+                    name: 'fluentcrm_get_funnel_subscribers',
+                    description: t('fluentcrm_get_funnel_subscribers'),
+                    inputSchema: {
+                        type: 'object',
+                        properties: {
+                            funnelId: { type: 'number', description: t('fluentcrm_get_funnel_subscribers', 'funnelId') },
+                            status: { type: 'string', enum: ['active', 'completed', 'cancelled'] },
+                            page: { type: 'number' },
+                        },
+                        required: ['funnelId'],
+                    },
+                },
+                {
+                    name: 'fluentcrm_update_funnel_subscriber_status',
+                    description: t('fluentcrm_update_funnel_subscriber_status'),
+                    inputSchema: {
+                        type: 'object',
+                        properties: {
+                            funnelId: { type: 'number', description: t('fluentcrm_update_funnel_subscriber_status', 'funnelId') },
+                            subscriberId: { type: 'number', description: t('fluentcrm_update_funnel_subscriber_status', 'subscriberId') },
+                            status: { type: 'string', description: t('fluentcrm_update_funnel_subscriber_status', 'status') },
+                        },
+                        required: ['funnelId', 'subscriberId', 'status'],
+                    },
+                },
+                {
+                    name: 'fluentcrm_remove_funnel_subscriber',
+                    description: t('fluentcrm_remove_funnel_subscriber'),
+                    inputSchema: {
+                        type: 'object',
+                        properties: {
+                            funnelId: { type: 'number', description: t('fluentcrm_remove_funnel_subscriber', 'funnelId') },
+                            subscriber_ids: { type: 'array', items: { type: 'number' }, description: t('fluentcrm_remove_funnel_subscriber', 'subscriber_ids') },
+                        },
+                        required: ['funnelId', 'subscriber_ids'],
+                    },
+                },
+                {
+                    name: 'fluentcrm_add_subscribers_to_funnel',
+                    description: t('fluentcrm_add_subscribers_to_funnel'),
+                    inputSchema: {
+                        type: 'object',
+                        properties: {
+                            funnelId: { type: 'number', description: t('fluentcrm_add_subscribers_to_funnel', 'funnelId') },
+                            subscriber_ids: { type: 'array', items: { type: 'number' }, description: t('fluentcrm_add_subscribers_to_funnel', 'subscriber_ids') },
+                        },
+                        required: ['funnelId', 'subscriber_ids'],
+                    },
+                },
+                {
+                    name: 'fluentcrm_get_funnel_report',
+                    description: t('fluentcrm_get_funnel_report'),
+                    inputSchema: {
+                        type: 'object',
+                        properties: {
+                            funnelId: { type: 'number', description: t('fluentcrm_get_funnel_report', 'funnelId') },
+                        },
+                        required: ['funnelId'],
+                    },
+                },
+                {
+                    name: 'fluentcrm_get_funnel_sequences',
+                    description: t('fluentcrm_get_funnel_sequences'),
+                    inputSchema: {
+                        type: 'object',
+                        properties: {
+                            funnelId: { type: 'number', description: t('fluentcrm_get_funnel_sequences', 'funnelId') },
+                        },
+                        required: ['funnelId'],
+                    },
+                },
+                // ===== WEBHOOKS =====
+                {
+                    name: 'fluentcrm_list_webhooks',
+                    description: t('fluentcrm_list_webhooks'),
+                    inputSchema: {
+                        type: 'object',
+                        properties: {},
+                    },
+                },
+                {
+                    name: 'fluentcrm_create_webhook',
+                    description: t('fluentcrm_create_webhook'),
+                    inputSchema: {
+                        type: 'object',
+                        properties: {
+                            name: { type: 'string', description: t('fluentcrm_create_webhook', 'name') },
+                            url: { type: 'string', description: t('fluentcrm_create_webhook', 'url') },
+                            status: { type: 'string', enum: ['pending', 'subscribed'] },
+                            tags: { type: 'array', items: { type: 'number' } },
+                            lists: { type: 'array', items: { type: 'number' } },
+                        },
+                        required: ['name', 'url', 'status'],
+                    },
+                },
+                // ===== SMART LINKS =====
+                {
+                    name: 'fluentcrm_list_smart_links',
+                    description: t('fluentcrm_list_smart_links'),
+                    inputSchema: {
+                        type: 'object',
+                        properties: {
+                            page: { type: 'number', description: t('fluentcrm_list_smart_links', 'page') },
+                            search: { type: 'string', description: t('fluentcrm_list_smart_links', 'search') },
+                        },
+                    },
+                },
+                {
+                    name: 'fluentcrm_get_smart_link',
+                    description: t('fluentcrm_get_smart_link'),
+                    inputSchema: {
+                        type: 'object',
+                        properties: {
+                            smartLinkId: { type: 'number', description: t('fluentcrm_get_smart_link', 'smartLinkId') },
+                        },
+                        required: ['smartLinkId'],
+                    },
+                },
+                {
+                    name: 'fluentcrm_create_smart_link',
+                    description: t('fluentcrm_create_smart_link'),
+                    inputSchema: {
+                        type: 'object',
+                        properties: {
+                            title: { type: 'string', description: t('fluentcrm_create_smart_link', 'title') },
+                            slug: { type: 'string', description: t('fluentcrm_create_smart_link', 'slug') },
+                            target_url: { type: 'string', description: t('fluentcrm_create_smart_link', 'target_url') },
+                            apply_tags: { type: 'array', items: { type: 'number' }, description: t('fluentcrm_create_smart_link', 'apply_tags') },
+                            apply_lists: { type: 'array', items: { type: 'number' }, description: t('fluentcrm_create_smart_link', 'apply_lists') },
+                            remove_tags: { type: 'array', items: { type: 'number' }, description: t('fluentcrm_create_smart_link', 'remove_tags') },
+                            remove_lists: { type: 'array', items: { type: 'number' }, description: t('fluentcrm_create_smart_link', 'remove_lists') },
+                            auto_login: { type: 'boolean', description: t('fluentcrm_create_smart_link', 'auto_login') },
+                        },
+                        required: ['title', 'target_url'],
+                    },
+                },
+                {
+                    name: 'fluentcrm_update_smart_link',
+                    description: t('fluentcrm_update_smart_link'),
+                    inputSchema: {
+                        type: 'object',
+                        properties: {
+                            smartLinkId: { type: 'number', description: t('fluentcrm_update_smart_link', 'smartLinkId') },
+                            title: { type: 'string' },
+                            target_url: { type: 'string' },
+                            apply_tags: { type: 'array', items: { type: 'number' } },
+                            apply_lists: { type: 'array', items: { type: 'number' } },
+                            remove_tags: { type: 'array', items: { type: 'number' } },
+                            remove_lists: { type: 'array', items: { type: 'number' } },
+                            auto_login: { type: 'boolean' },
+                        },
+                        required: ['smartLinkId'],
+                    },
+                },
+                {
+                    name: 'fluentcrm_delete_smart_link',
+                    description: t('fluentcrm_delete_smart_link'),
+                    inputSchema: {
+                        type: 'object',
+                        properties: {
+                            smartLinkId: { type: 'number', description: t('fluentcrm_delete_smart_link', 'smartLinkId') },
+                        },
+                        required: ['smartLinkId'],
+                    },
+                },
+                {
+                    name: 'fluentcrm_generate_smart_link_shortcode',
+                    description: t('fluentcrm_generate_smart_link_shortcode'),
+                    inputSchema: {
+                        type: 'object',
+                        properties: {
+                            slug: { type: 'string', description: t('fluentcrm_generate_smart_link_shortcode', 'slug') },
+                            linkText: { type: 'string', description: t('fluentcrm_generate_smart_link_shortcode', 'linkText') },
+                        },
+                        required: ['slug'],
+                    },
+                },
+                {
+                    name: 'fluentcrm_validate_smart_link_data',
+                    description: t('fluentcrm_validate_smart_link_data'),
+                    inputSchema: {
+                        type: 'object',
+                        properties: {
+                            title: { type: 'string', description: t('fluentcrm_validate_smart_link_data', 'title') },
+                            slug: { type: 'string', description: t('fluentcrm_validate_smart_link_data', 'slug') },
+                            target_url: { type: 'string', description: t('fluentcrm_validate_smart_link_data', 'target_url') },
+                            apply_tags: { type: 'array', items: { type: 'number' } },
+                            apply_lists: { type: 'array', items: { type: 'number' } },
+                            remove_tags: { type: 'array', items: { type: 'number' } },
+                            remove_lists: { type: 'array', items: { type: 'number' } },
+                            auto_login: { type: 'boolean' },
+                        },
+                        required: ['title', 'target_url'],
+                    },
+                },
+                // ===== REPORTS =====
+                {
+                    name: 'fluentcrm_dashboard_stats',
+                    description: t('fluentcrm_dashboard_stats'),
+                    inputSchema: {
+                        type: 'object',
+                        properties: {},
+                    },
+                },
+                {
+                    name: 'fluentcrm_custom_fields',
+                    description: t('fluentcrm_custom_fields'),
+                    inputSchema: {
+                        type: 'object',
+                        properties: {},
+                    },
+                },
+            ],
+        };
+    });
+    server.setRequestHandler(CallToolRequestSchema, async (request) => {
+        const { name, arguments: args } = request.params;
+        try {
+            switch (name) {
+                case 'fluentcrm_list_contacts':
+                    return { content: [{ type: 'text', text: JSON.stringify(await client.listContacts(args || {}), null, 2) }] };
+                case 'fluentcrm_get_contact':
+                    return { content: [{ type: 'text', text: JSON.stringify(await client.getContact(args?.subscriberId), null, 2) }] };
+                case 'fluentcrm_find_contact_by_email':
+                    return { content: [{ type: 'text', text: JSON.stringify(await client.findContactByEmail(args?.email), null, 2) }] };
+                case 'fluentcrm_create_contact':
+                    return { content: [{ type: 'text', text: JSON.stringify(await client.createContact(args), null, 2) }] };
+                case 'fluentcrm_update_contact':
+                    return { content: [{ type: 'text', text: JSON.stringify(await client.updateContact(args?.subscriberId, args), null, 2) }] };
+                case 'fluentcrm_delete_contact':
+                    return { content: [{ type: 'text', text: JSON.stringify(await client.deleteContact(args?.subscriberId), null, 2) }] };
+                case 'fluentcrm_list_tags':
+                    return { content: [{ type: 'text', text: JSON.stringify(await client.listTags(args || {}), null, 2) }] };
+                case 'fluentcrm_create_tag':
+                    return { content: [{ type: 'text', text: JSON.stringify(await client.createTag(args), null, 2) }] };
+                case 'fluentcrm_delete_tag':
+                    return { content: [{ type: 'text', text: JSON.stringify(await client.deleteTag(args?.tagId), null, 2) }] };
+                case 'fluentcrm_attach_tag_to_contact':
+                    return { content: [{ type: 'text', text: JSON.stringify(await client.attachTagToContact(args?.subscriberId, args?.tagIds), null, 2) }] };
+                case 'fluentcrm_detach_tag_from_contact':
+                    return { content: [{ type: 'text', text: JSON.stringify(await client.detachTagFromContact(args?.subscriberId, args?.tagIds), null, 2) }] };
+                case 'fluentcrm_list_lists':
+                    return { content: [{ type: 'text', text: JSON.stringify(await client.listLists(), null, 2) }] };
+                case 'fluentcrm_create_list':
+                    return { content: [{ type: 'text', text: JSON.stringify(await client.createList(args), null, 2) }] };
+                case 'fluentcrm_delete_list':
+                    return { content: [{ type: 'text', text: JSON.stringify(await client.deleteList(args?.listId), null, 2) }] };
+                case 'fluentcrm_attach_contact_to_list':
+                    return { content: [{ type: 'text', text: JSON.stringify(await client.attachContactToList(args?.subscriberId, args?.listIds), null, 2) }] };
+                case 'fluentcrm_detach_contact_from_list':
+                    return { content: [{ type: 'text', text: JSON.stringify(await client.detachContactFromList(args?.subscriberId, args?.listIds), null, 2) }] };
+                case 'fluentcrm_list_dynamic_segments':
+                    return { content: [{ type: 'text', text: JSON.stringify(await client.listDynamicSegments(), null, 2) }] };
+                case 'fluentcrm_list_campaigns':
+                    return { content: [{ type: 'text', text: JSON.stringify(await client.listCampaigns(args || {}), null, 2) }] };
+                // case 'fluentcrm_create_campaign': disabled — see tool definition comment
+                case 'fluentcrm_pause_campaign':
+                    return { content: [{ type: 'text', text: JSON.stringify(await client.pauseCampaign(args?.campaignId), null, 2) }] };
+                case 'fluentcrm_resume_campaign':
+                    return { content: [{ type: 'text', text: JSON.stringify(await client.resumeCampaign(args?.campaignId), null, 2) }] };
+                case 'fluentcrm_delete_campaign':
+                    return { content: [{ type: 'text', text: JSON.stringify(await client.deleteCampaign(args?.campaignId), null, 2) }] };
+                case 'fluentcrm_add_contacts_to_campaign':
+                    return { content: [{ type: 'text', text: JSON.stringify(await client.addContactsToCampaign(args?.campaignId, args?.contact_ids), null, 2) }] };
+                case 'fluentcrm_list_email_templates':
+                    return { content: [{ type: 'text', text: JSON.stringify(await client.listEmailTemplates(), null, 2) }] };
+                case 'fluentcrm_create_email_template':
+                    return { content: [{ type: 'text', text: JSON.stringify(await client.createEmailTemplate(args), null, 2) }] };
+                case 'fluentcrm_list_automations':
+                    return { content: [{ type: 'text', text: JSON.stringify(await client.listAutomations(args || {}), null, 2) }] };
+                case 'fluentcrm_get_automation':
+                    return { content: [{ type: 'text', text: JSON.stringify(await client.getAutomation(args?.funnelId), null, 2) }] };
+                case 'fluentcrm_update_funnel_status':
+                    return { content: [{ type: 'text', text: JSON.stringify(await client.updateFunnelStatus(args?.funnelId, args?.status), null, 2) }] };
+                case 'fluentcrm_duplicate_funnel':
+                    return { content: [{ type: 'text', text: JSON.stringify(await client.duplicateFunnel(args?.funnelId), null, 2) }] };
+                case 'fluentcrm_delete_automation':
+                    return { content: [{ type: 'text', text: JSON.stringify(await client.deleteAutomation(args?.funnelId), null, 2) }] };
+                case 'fluentcrm_get_funnel_subscribers':
+                    return { content: [{ type: 'text', text: JSON.stringify(await client.getFunnelSubscribers(args?.funnelId, args || {}), null, 2) }] };
+                case 'fluentcrm_update_funnel_subscriber_status':
+                    return { content: [{ type: 'text', text: JSON.stringify(await client.updateFunnelSubscriberStatus(args?.funnelId, args?.subscriberId, args?.status), null, 2) }] };
+                case 'fluentcrm_remove_funnel_subscriber':
+                    return { content: [{ type: 'text', text: JSON.stringify(await client.removeFunnelSubscribers(args?.funnelId, args?.subscriber_ids), null, 2) }] };
+                case 'fluentcrm_add_subscribers_to_funnel':
+                    return { content: [{ type: 'text', text: JSON.stringify(await client.addSubscribersToFunnel(args?.funnelId, args?.subscriber_ids), null, 2) }] };
+                case 'fluentcrm_get_funnel_report':
+                    return { content: [{ type: 'text', text: JSON.stringify(await client.getFunnelReport(args?.funnelId), null, 2) }] };
+                case 'fluentcrm_get_funnel_sequences':
+                    return { content: [{ type: 'text', text: JSON.stringify(await client.getFunnelSequences(args?.funnelId), null, 2) }] };
+                case 'fluentcrm_list_webhooks':
+                    return { content: [{ type: 'text', text: JSON.stringify(await client.listWebhooks(), null, 2) }] };
+                case 'fluentcrm_create_webhook':
+                    return { content: [{ type: 'text', text: JSON.stringify(await client.createWebhook(args), null, 2) }] };
+                case 'fluentcrm_dashboard_stats':
+                    return { content: [{ type: 'text', text: JSON.stringify(await client.getDashboardStats(), null, 2) }] };
+                case 'fluentcrm_custom_fields':
+                    return { content: [{ type: 'text', text: JSON.stringify(await client.listCustomFields(), null, 2) }] };
+                // ===== SMART LINKS =====
+                case 'fluentcrm_list_smart_links':
+                    return { content: [{ type: 'text', text: JSON.stringify(await client.listSmartLinks(args || {}), null, 2) }] };
+                case 'fluentcrm_get_smart_link':
+                    return { content: [{ type: 'text', text: JSON.stringify(await client.getSmartLink(args?.smartLinkId), null, 2) }] };
+                case 'fluentcrm_create_smart_link':
+                    return { content: [{ type: 'text', text: JSON.stringify(await client.createSmartLink(args), null, 2) }] };
+                case 'fluentcrm_update_smart_link':
+                    return { content: [{ type: 'text', text: JSON.stringify(await client.updateSmartLink(args?.smartLinkId, args), null, 2) }] };
+                case 'fluentcrm_delete_smart_link':
+                    return { content: [{ type: 'text', text: JSON.stringify(await client.deleteSmartLink(args?.smartLinkId), null, 2) }] };
+                case 'fluentcrm_generate_smart_link_shortcode':
+                    return { content: [{ type: 'text', text: JSON.stringify({ shortcode: client.generateSmartLinkShortcode(args?.slug, args?.linkText) }, null, 2) }] };
+                case 'fluentcrm_validate_smart_link_data':
+                    return { content: [{ type: 'text', text: JSON.stringify(client.validateSmartLinkData(args), null, 2) }] };
+                default:
+                    throw new Error(`Unknown tool: ${name}`);
+            }
+        }
+        catch (error) {
+            return {
+                content: [{ type: 'text', text: `❌ Error: ${error.message}` }],
+                isError: true,
+            };
+        }
+    });
+    return server;
+}
+// ─── HTTP transport (used on Render / any cloud host) ───────────────────────
+async function startHTTP(port) {
+    const transports = new Map();
+    const AUTH_TOKEN = process.env.MCP_AUTH_TOKEN;
+    const readBody = (req) => new Promise((resolve, reject) => {
+        const chunks = [];
+        req.on('data', (c) => chunks.push(c));
+        req.on('end', () => resolve(Buffer.concat(chunks).toString()));
+        req.on('error', reject);
+    });
+    const httpServer = createServer(async (req, res) => {
+        // Optional bearer-token auth
+        if (AUTH_TOKEN) {
+            const auth = req.headers['authorization'] || '';
+            if (!auth.startsWith('Bearer ') || auth.slice(7) !== AUTH_TOKEN) {
+                res.writeHead(401, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ error: 'Unauthorized' }));
+                return;
+            }
+        }
+        // Health-check endpoint
+        if (req.url === '/health' && req.method === 'GET') {
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ status: 'ok', server: 'fluentcrm-mcp' }));
+            return;
+        }
+        const url = new URL(req.url || '/', `http://localhost:${port}`);
+        if (url.pathname !== '/mcp') {
+            res.writeHead(404);
+            res.end();
+            return;
+        }
+        if (req.method === 'POST') {
+            const sessionId = req.headers['mcp-session-id'];
+            let transport;
+            if (sessionId && transports.has(sessionId)) {
+                transport = transports.get(sessionId);
+            }
+            else {
+                transport = new StreamableHTTPServerTransport({
+                    sessionIdGenerator: () => randomUUID(),
+                    onsessioninitialized: (sid) => { transports.set(sid, transport); },
+                });
+                transport.onclose = () => {
+                    if (transport.sessionId)
+                        transports.delete(transport.sessionId);
+                };
+                const fcrmUrl = req.headers['x-fluentcrm-url'] || FLUENTCRM_API_URL;
+                const fcrmUser = req.headers['x-fluentcrm-username'] || FLUENTCRM_API_USERNAME;
+                const fcrmPass = req.headers['x-fluentcrm-password'] || FLUENTCRM_API_PASSWORD;
+                const sessionClient = new FluentCRMClient(fcrmUrl, fcrmUser, fcrmPass);
+                const sessionServer = createMcpServer(sessionClient);
+                await sessionServer.connect(transport);
+            }
+            const rawBody = await readBody(req);
+            const body = JSON.parse(rawBody);
+            await transport.handleRequest(req, res, body);
+        }
+        else if (req.method === 'GET') {
+            const sessionId = req.headers['mcp-session-id'];
+            if (!sessionId || !transports.has(sessionId)) {
+                res.writeHead(400);
+                res.end('Invalid session ID');
+                return;
+            }
+            await transports.get(sessionId).handleRequest(req, res);
+        }
+        else if (req.method === 'DELETE') {
+            const sessionId = req.headers['mcp-session-id'];
+            if (sessionId && transports.has(sessionId)) {
+                await transports.get(sessionId).close();
+                transports.delete(sessionId);
+            }
+            res.writeHead(200);
+            res.end();
+        }
+        else {
+            res.writeHead(405);
+            res.end();
+        }
+    });
+    httpServer.listen(port, '0.0.0.0', () => {
+        console.error(`🚀 FluentCRM MCP Server running on HTTP port ${port}`);
+        console.error(`📡 MCP endpoint: http://0.0.0.0:${port}/mcp`);
+        console.error(`📡 FluentCRM API: ${FLUENTCRM_API_URL}`);
+        if (AUTH_TOKEN)
+            console.error('🔒 Bearer auth enabled (MCP_AUTH_TOKEN is set)');
+        else
+            console.error('⚠️  No MCP_AUTH_TOKEN set — endpoint is open');
+    });
+}
+// ─── Entrypoint ──────────────────────────────────────────────────────────────
+async function main() {
+    if (process.env.PORT) {
+        await startHTTP(parseInt(process.env.PORT, 10));
+    }
+    else {
+        const stdioClient = new FluentCRMClient(FLUENTCRM_API_URL, FLUENTCRM_API_USERNAME, FLUENTCRM_API_PASSWORD);
+        const stdioServer = createMcpServer(stdioClient);
+        const transport = new StdioServerTransport();
+        await stdioServer.connect(transport);
+        console.error('🚀 FluentCRM MCP Server running on stdio');
+        console.error(`📡 API URL: ${FLUENTCRM_API_URL}`);
+        console.error(`👤 Username: ${FLUENTCRM_API_USERNAME}`);
+    }
+}
+main().catch((error) => {
+    console.error('❌ Server error:', error);
+    process.exit(1);
+});
+//# sourceMappingURL=fluentcrm-mcp-server.js.map

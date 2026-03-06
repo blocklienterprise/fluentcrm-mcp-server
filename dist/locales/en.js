@@ -1,0 +1,235 @@
+export const locale = {
+    tools: {
+        // CONTACTS
+        fluentcrm_list_contacts: {
+            description: 'Retrieves a list of all contacts from FluentCRM',
+            params: {
+                page: 'Page number (default: 1)',
+                per_page: 'Records per page (default: 10)',
+                search: 'Search by email or name',
+            },
+        },
+        fluentcrm_get_contact: {
+            description: 'Retrieves details of a specific contact',
+            params: { subscriberId: 'Contact ID' },
+        },
+        fluentcrm_find_contact_by_email: {
+            description: 'Finds a contact by email address',
+            params: { email: 'Email address' },
+        },
+        fluentcrm_create_contact: {
+            description: 'Creates a new contact in FluentCRM',
+            params: {
+                email: 'Contact email',
+                first_name: 'First name',
+                last_name: 'Last name',
+                phone: 'Phone number',
+                address_line_1: 'Address',
+                city: 'City',
+                country: 'Country',
+            },
+        },
+        fluentcrm_update_contact: {
+            description: 'Updates contact details',
+            params: { subscriberId: 'Contact ID' },
+        },
+        fluentcrm_delete_contact: {
+            description: 'Deletes a contact from FluentCRM',
+            params: { subscriberId: 'ID of the contact to delete' },
+        },
+        // TAGS
+        fluentcrm_list_tags: {
+            description: 'Retrieves all tags from FluentCRM',
+            params: { page: 'Page number', search: 'Search tags' },
+        },
+        fluentcrm_create_tag: {
+            description: 'Creates a new tag in FluentCRM',
+            params: {
+                title: 'Tag name (e.g. "AW-progress-75")',
+                slug: 'Tag slug (e.g. "aw-progress-75")',
+                description: 'Tag description',
+            },
+        },
+        fluentcrm_delete_tag: {
+            description: 'Deletes a tag from FluentCRM',
+            params: { tagId: 'Tag ID' },
+        },
+        fluentcrm_attach_tag_to_contact: {
+            description: 'Attaches a tag to a contact',
+            params: { subscriberId: 'Contact ID', tagIds: 'List of tag IDs' },
+        },
+        fluentcrm_detach_tag_from_contact: {
+            description: 'Removes a tag from a contact',
+            params: { subscriberId: 'Contact ID', tagIds: 'List of tag IDs' },
+        },
+        // LISTS
+        fluentcrm_list_lists: { description: 'Retrieves all lists from FluentCRM' },
+        fluentcrm_create_list: {
+            description: 'Creates a new list in FluentCRM',
+            params: { title: 'List name', slug: 'List slug', description: 'List description' },
+        },
+        fluentcrm_delete_list: {
+            description: 'Deletes a list from FluentCRM',
+            params: { listId: 'List ID' },
+        },
+        fluentcrm_attach_contact_to_list: {
+            description: 'Adds a contact to a list',
+            params: { subscriberId: 'Contact ID', listIds: 'List of list IDs' },
+        },
+        fluentcrm_detach_contact_from_list: {
+            description: 'Removes a contact from a list',
+            params: { subscriberId: 'Contact ID', listIds: 'List of list IDs' },
+        },
+        // CAMPAIGNS
+        fluentcrm_list_dynamic_segments: {
+            description: 'Lists all available dynamic segments on this site (e.g. WordPress Users, WooCommerce Customers). Returns slug, title, and description for each. Use the slug + id=0 as dynamic_segment_slug/dynamic_segment_id in fluentcrm_create_campaign.',
+        },
+        fluentcrm_list_campaigns: {
+            description: 'Retrieves a list of email campaigns',
+        },
+        fluentcrm_create_campaign: {
+            description: 'Creates a new email campaign',
+            params: {
+                title: 'Campaign title',
+                subject: 'Primary email subject line',
+                template_id: 'ID of an existing email template to import as body',
+                recipient_list: 'Array of List IDs to send to',
+                email_pre_header: 'Preview text shown after the subject in inboxes',
+                subjects: 'A/B test subjects array: [{subject, ratio}] — ratio is priority % (must total 100)',
+                from_name: 'Custom sender name (overrides SMTP default)',
+                from_email: 'Custom sender email address',
+                reply_to_name: 'Reply-To name',
+                reply_to_email: 'Reply-To email address',
+                utm_source: 'UTM source (e.g. newsletter) — REQUIRED when any UTM field is used',
+                utm_medium: 'UTM medium (e.g. email) — REQUIRED when any UTM field is used',
+                utm_campaign: 'UTM campaign name — REQUIRED when any UTM field is used',
+                utm_term: 'UTM term (optional)',
+                utm_content: 'UTM content / differentiator (optional)',
+                tags: 'Array of Tag IDs to include as recipients (By List & Tag mode)',
+                exclude_tags: 'Array of Tag IDs to exclude from recipients (subtracted from included set, list_tag mode only)',
+                exclude_lists: 'Array of List IDs to exclude from recipients (subtracted from included set, list_tag mode only)',
+                contact_emails: 'Array of specific recipient email addresses (uses By Advanced Filter mode)',
+                contact_ids: 'Array of specific subscriber IDs to restrict recipients to (uses By Advanced Filter mode)',
+                advanced_filters: 'Raw By Advanced Filter groups — array of filter groups, each group is an array of {property, operator, value} conditions (AND within group, OR between groups)',
+                dynamic_segment_slug: 'By Dynamic Segment mode: the segment slug. Known built-in slugs: "wp_users" (WordPress Users), "edd_customers" (Easy Digital Downloads Customers), "wc_customers" (WooCommerce Customers). Use fluentcrm_list_dynamic_segments to discover all available options. Must be paired with dynamic_segment_id.',
+                dynamic_segment_id: 'By Dynamic Segment mode: ID of the segment. For all built-in system segments (wp_users, edd_customers, wc_customers) use 0. Must be paired with dynamic_segment_slug.',
+                scheduled_at: 'Schedule send time as "YYYY-MM-DD HH:mm:ss" (UTC). Sets campaign status to "pending-scheduled". Omit to leave as draft.',
+            },
+        },
+        fluentcrm_pause_campaign: {
+            description: 'Pauses a campaign',
+            params: { campaignId: 'Campaign ID' },
+        },
+        fluentcrm_resume_campaign: {
+            description: 'Resumes a paused campaign',
+            params: { campaignId: 'Campaign ID' },
+        },
+        fluentcrm_delete_campaign: {
+            description: 'Deletes a campaign',
+            params: { campaignId: 'Campaign ID' },
+        },
+        fluentcrm_add_contacts_to_campaign: {
+            description: 'Adds specific contacts (by subscriber ID) to an existing campaign as recipients',
+            params: {
+                campaignId: 'ID of the campaign to update',
+                contact_ids: 'Array of subscriber IDs to add as recipients (replaces any existing advanced_filters)',
+            },
+        },
+        // EMAIL TEMPLATES
+        fluentcrm_list_email_templates: { description: 'Retrieves email templates' },
+        fluentcrm_create_email_template: {
+            description: 'Creates a new email template',
+            params: { title: 'Template name', subject: 'Subject', body: 'HTML body content' },
+        },
+        // AUTOMATIONS
+        fluentcrm_list_automations: { description: 'Retrieves automations (funnels)' },
+        fluentcrm_get_automation: {
+            description: 'Retrieves a specific automation funnel by ID',
+            params: { funnelId: 'Funnel ID' },
+        },
+        fluentcrm_update_funnel_status: {
+            description: 'Updates the status of a funnel (published, draft, or paused)',
+            params: { funnelId: 'Funnel ID', status: 'New status: published, draft, or paused' },
+        },
+        fluentcrm_duplicate_funnel: {
+            description: 'Creates a copy of an existing funnel',
+            params: { funnelId: 'Funnel ID to duplicate' },
+        },
+        fluentcrm_delete_automation: {
+            description: 'Deletes a funnel and stops all active sequences',
+            params: { funnelId: 'Funnel ID to delete' },
+        },
+        fluentcrm_get_funnel_subscribers: {
+            description: 'Retrieves subscribers enrolled in a funnel',
+            params: { funnelId: 'Funnel ID', status: 'Filter by status: active, completed, or cancelled' },
+        },
+        fluentcrm_update_funnel_subscriber_status: {
+            description: 'Updates the status of a contact already enrolled in a funnel (e.g. active, paused, cancelled)',
+            params: { funnelId: 'Funnel ID', subscriberId: 'Subscriber (contact) ID', status: 'New status: active, paused, or cancelled' },
+        },
+        fluentcrm_remove_funnel_subscriber: {
+            description: 'Removes one or more contacts from a funnel',
+            params: { funnelId: 'Funnel ID', subscriber_ids: 'Array of subscriber (contact) IDs to remove' },
+        },
+        fluentcrm_add_subscribers_to_funnel: {
+            description: 'Adds one or more contacts to a funnel (automation). Requires FluentCRM Pro.',
+            params: { funnelId: 'Funnel ID to enroll the contacts into', subscriber_ids: 'Array of contact IDs to add to the funnel' },
+        },
+        fluentcrm_get_funnel_report: {
+            description: 'Retrieves performance report for a funnel',
+            params: { funnelId: 'Funnel ID' },
+        },
+        fluentcrm_get_funnel_sequences: {
+            description: 'Retrieves all steps (sequences/actions) in a funnel automation. Returns each step with its type, action name, settings, and any conditional branches.',
+            params: { funnelId: 'Funnel ID' },
+        },
+        // WEBHOOKS
+        fluentcrm_list_webhooks: { description: 'Retrieves webhooks' },
+        fluentcrm_create_webhook: {
+            description: 'Creates a new webhook',
+            params: { name: 'Webhook name', url: 'Webhook URL' },
+        },
+        // SMART LINKS
+        fluentcrm_list_smart_links: {
+            description: 'Retrieves a list of Smart Links from FluentCRM (may not be available in all versions)',
+            params: { page: 'Page number', search: 'Search Smart Links' },
+        },
+        fluentcrm_get_smart_link: {
+            description: 'Retrieves details of a specific Smart Link',
+            params: { smartLinkId: 'Smart Link ID' },
+        },
+        fluentcrm_create_smart_link: {
+            description: 'Creates a new Smart Link (may not be available in all versions)',
+            params: {
+                title: 'Smart Link name (e.g. "AW-Link-Webinar-Mail")',
+                slug: 'Slug (e.g. "aw-link-webinar-mail")',
+                target_url: 'Target URL',
+                apply_tags: 'Tag IDs to apply on click',
+                apply_lists: 'List IDs to apply on click',
+                remove_tags: 'Tag IDs to remove on click',
+                remove_lists: 'List IDs to remove on click',
+                auto_login: 'Automatically log in the user on click',
+            },
+        },
+        fluentcrm_update_smart_link: {
+            description: 'Updates a Smart Link (may not be available in all versions)',
+            params: { smartLinkId: 'Smart Link ID' },
+        },
+        fluentcrm_delete_smart_link: {
+            description: 'Deletes a Smart Link (may not be available in all versions)',
+            params: { smartLinkId: 'ID of the Smart Link to delete' },
+        },
+        fluentcrm_generate_smart_link_shortcode: {
+            description: 'Generates a shortcode for a Smart Link',
+            params: { slug: 'Smart Link slug', linkText: 'Link text (optional)' },
+        },
+        fluentcrm_validate_smart_link_data: {
+            description: 'Validates Smart Link data before creation',
+            params: { title: 'Smart Link name', slug: 'Slug', target_url: 'Target URL' },
+        },
+        // REPORTS
+        fluentcrm_dashboard_stats: { description: 'Retrieves dashboard statistics' },
+        fluentcrm_custom_fields: { description: 'Retrieves custom fields' },
+    },
+};
+//# sourceMappingURL=en.js.map
