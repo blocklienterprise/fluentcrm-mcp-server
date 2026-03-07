@@ -1,6 +1,5 @@
 #!/usr/bin/env node
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
-import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { CallToolRequestSchema, ListToolsRequestSchema, } from '@modelcontextprotocol/sdk/types.js';
 import axios from 'axios';
@@ -1429,18 +1428,8 @@ async function startHTTP(port) {
 }
 // ─── Entrypoint ──────────────────────────────────────────────────────────────
 async function main() {
-    if (process.env.PORT) {
-        await startHTTP(parseInt(process.env.PORT, 10));
-    }
-    else {
-        const stdioClient = new FluentCRMClient(FLUENTCRM_API_URL, FLUENTCRM_API_USERNAME, FLUENTCRM_API_PASSWORD);
-        const stdioServer = createMcpServer(stdioClient);
-        const transport = new StdioServerTransport();
-        await stdioServer.connect(transport);
-        console.error('🚀 FluentCRM MCP Server running on stdio');
-        console.error(`📡 API URL: ${FLUENTCRM_API_URL}`);
-        console.error(`👤 Username: ${FLUENTCRM_API_USERNAME}`);
-    }
+    const port = parseInt(process.env.PORT || '3001', 10);
+    await startHTTP(port);
 }
 main().catch((error) => {
     console.error('❌ Server error:', error);
