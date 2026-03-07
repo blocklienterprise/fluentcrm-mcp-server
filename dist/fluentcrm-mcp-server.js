@@ -8,6 +8,17 @@ import { createServer } from 'http';
 import { t } from './i18n.js';
 import { randomUUID } from 'crypto';
 dotenv.config();
+// ─── Process-level error guards ──────────────────────────────────────────────
+// Without these, Node.js v22 may exit with code 0 on unhandledRejection,
+// which causes a silent death that concurrently --kill-others-on-fail ignores.
+process.on('uncaughtException', (err) => {
+    console.error('[fluentcrm] uncaughtException:', err.message);
+    process.exit(1);
+});
+process.on('unhandledRejection', (reason) => {
+    console.error('[fluentcrm] unhandledRejection:', reason);
+    process.exit(1);
+});
 const FLUENTCRM_API_URL = process.env.FLUENTCRM_API_URL || 'https://your-domain.com/wp-json/fluent-crm/v2';
 const FLUENTCRM_API_USERNAME = process.env.FLUENTCRM_API_USERNAME || '';
 const FLUENTCRM_API_PASSWORD = process.env.FLUENTCRM_API_PASSWORD || '';
@@ -1416,8 +1427,14 @@ async function startHTTP(port) {
             res.end();
         }
     });
+    httpServer.on('error', (err) => {
+        console.error(`[fluentcrm] httpServer error: ${err.code} port=${port}`);
+        process.exit(1);
+    });
     httpServer.listen(port, '0.0.0.0', () => {
         console.error(`🚀 FluentCRM MCP Server running on HTTP port ${port}`);
+        console.error(`[fluentcrm] PORT env was: ${process.env.PORT}`);
+        console.error(`[fluentcrm] node: ${process.version}`);
         console.error(`📡 MCP endpoint: http://0.0.0.0:${port}/mcp`);
         console.error(`📡 FluentCRM API: ${FLUENTCRM_API_URL}`);
         if (AUTH_TOKEN)
