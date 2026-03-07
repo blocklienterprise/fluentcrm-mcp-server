@@ -1,5 +1,16 @@
 #!/usr/bin/env node
 
+// ─── Early crash handlers (must be first) ────────────────────────────────────
+process.on('uncaughtException', (err) => {
+  console.error('[fluentcrm] UNCAUGHT EXCEPTION:', err.message, err.stack);
+  process.exit(1);
+});
+process.on('unhandledRejection', (reason) => {
+  console.error('[fluentcrm] UNHANDLED REJECTION:', reason);
+  process.exit(1);
+});
+console.error('[fluentcrm] Process starting. PORT env:', process.env.PORT, '| node version:', process.version);
+
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import {
@@ -1573,6 +1584,10 @@ async function startHTTP(port: number): Promise<void> {
     }
   });
 
+  httpServer.on('error', (err: NodeJS.ErrnoException) => {
+    console.error(`[fluentcrm] httpServer error: code=${err.code} port=${port} message=${err.message}`);
+    process.exit(1);
+  });
   httpServer.listen(port, '0.0.0.0', () => {
     console.error(`🚀 FluentCRM MCP Server running on HTTP port ${port}`);
     console.error(`📡 MCP endpoint: http://0.0.0.0:${port}/mcp`);
@@ -1585,6 +1600,7 @@ async function startHTTP(port: number): Promise<void> {
 // ─── Entrypoint ──────────────────────────────────────────────────────────────
 async function main() {
   const port = parseInt(process.env.PORT || '3001', 10);
+  console.error(`[fluentcrm] main() called. Resolved port: ${port}`);
   await startHTTP(port);
 }
 
