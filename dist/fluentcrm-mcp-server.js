@@ -68,6 +68,19 @@ class FluentCRMClient {
             err.responseData = data;
             throw err;
         });
+        // Error interceptor for blockli assistant endpoints — surfaces PHP error/code/data to MCP clients
+        this.blockliApiClient.interceptors.response.use(response => response, error => {
+            const data = error.response?.data;
+            console.error('[Blockli] API error response body:', JSON.stringify(data));
+            const message = data?.error || data?.message || error.message;
+            const detail = data && Object.keys(data).length > 0
+                ? ` Full response: ${JSON.stringify(data)}`
+                : '';
+            const err = new Error(`Blockli API Error: ${message}${detail}`);
+            err.httpStatus = error.response?.status;
+            err.responseData = data;
+            throw err;
+        });
     }
     // ===== SUBSCRIBERS / KONTAKTY =====
     async listContacts(params = {}) {
