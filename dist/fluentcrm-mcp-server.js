@@ -28,6 +28,7 @@ const FLUENTCRM_API_PASSWORD = process.env.FLUENTCRM_API_PASSWORD || '';
  */
 class FluentCRMClient {
     apiClient;
+    blockliApiClient;
     baseURL;
     constructor(baseURL, username, password) {
         this.baseURL = baseURL;
@@ -42,6 +43,17 @@ class FluentCRMClient {
                 'ngrok-skip-browser-warning': 'true',
             },
             timeout: 180000, // 3 minutes — accommodates Render cold-start + API latency
+        });
+        // Blockli Assistant REST API client — same WordPress site, same credentials
+        const blockliBase = baseURL.replace(/\/fluent-crm\/v2\/?$/, '') + '/wp-json/blockli_assistant/v1';
+        this.blockliApiClient = axios.create({
+            baseURL: blockliBase,
+            headers: {
+                'Authorization': `Basic ${credentials}`,
+                'Content-Type': 'application/json',
+                'Accept': 'application/json',
+            },
+            timeout: 180000,
         });
         // Error interceptor
         this.apiClient.interceptors.response.use(response => response, error => {
@@ -643,6 +655,55 @@ class FluentCRMClient {
         const response = await this.apiClient.get('/reports/subscribers-growth-rate', { params });
         return response.data;
     }
+    // ===== BLOCKLI DIRECT-PHP ENDPOINTS =====
+    async getCrmContext() {
+        const response = await this.blockliApiClient.get('/fluentcrm/crm-context');
+        return response.data;
+    }
+    async sendEmail(data) {
+        const response = await this.blockliApiClient.post('/fluentcrm/send-email', data);
+        return response.data;
+    }
+    async sendTestEmail(data) {
+        const response = await this.blockliApiClient.post('/fluentcrm/send-test-email', data);
+        return response.data;
+    }
+    async addContactNote(data) {
+        const response = await this.blockliApiClient.post('/fluentcrm/add-contact-note', data);
+        return response.data;
+    }
+    async deleteContactNote(noteId) {
+        const response = await this.blockliApiClient.post('/fluentcrm/delete-contact-note', { note_id: noteId });
+        return response.data;
+    }
+    async bulkUpsertContacts(data) {
+        const response = await this.blockliApiClient.post('/fluentcrm/bulk-upsert-contacts', data);
+        return response.data;
+    }
+    async applySegments(data) {
+        const response = await this.blockliApiClient.post('/fluentcrm/apply-segments', data);
+        return response.data;
+    }
+    async getBlockliCampaign(id) {
+        const response = await this.blockliApiClient.get(`/fluentcrm/campaigns/${id}`);
+        return response.data;
+    }
+    async upsertCampaign(data) {
+        const response = await this.blockliApiClient.post('/fluentcrm/upsert-campaign', data);
+        return response.data;
+    }
+    async changeCampaignStatus(data) {
+        const response = await this.blockliApiClient.post('/fluentcrm/change-campaign-status', data);
+        return response.data;
+    }
+    async manageTag(data) {
+        const response = await this.blockliApiClient.post('/fluentcrm/manage-tag', data);
+        return response.data;
+    }
+    async manageList(data) {
+        const response = await this.blockliApiClient.post('/fluentcrm/manage-list', data);
+        return response.data;
+    }
 }
 // ===== MCP SERVER SETUP =====
 function createMcpServer(client) {
@@ -1231,6 +1292,159 @@ function createMcpServer(client) {
                         properties: {},
                     },
                 },
+                // ===== BLOCKLI NATIVE PHP TOOLS =====
+                {
+                    name: 'fluentcrm_get_crm_context',
+                    description: 'Get full CRM context: lists, tags, campaigns, sequences, custom fields, and dashboard stats in one call.',
+                    inputSchema: { type: 'object', properties: {} },
+                },
+                {
+                    name: 'fluentcrm_send_email',
+                    description: 'Send a FluentCRM email to a contact using a template.',
+                    inputSchema: {
+                        type: 'object',
+                        properties: {
+                            contact_id: { type: 'number', description: 'Contact ID' },
+                            template_id: { type: 'number', description: 'Email template ID' },
+                            subject: { type: 'string', description: 'Email subject (overrides template)' },
+                        },
+                        required: ['contact_id', 'template_id'],
+                    },
+                },
+                {
+                    name: 'fluentcrm_send_test_email',
+                    description: 'Send a test email for a campaign or template.',
+                    inputSchema: {
+                        type: 'object',
+                        properties: {
+                            campaign_id: { type: 'number', description: 'Campaign ID' },
+                            email: { type: 'string', description: 'Recipient email address for testing' },
+                        },
+                        required: ['campaign_id', 'email'],
+                    },
+                },
+                {
+                    name: 'fluentcrm_add_contact_note',
+                    description: 'Add a note to a FluentCRM contact.',
+                    inputSchema: {
+                        type: 'object',
+                        properties: {
+                            contact_id: { type: 'number', description: 'Contact ID' },
+                            note: { type: 'string', description: 'Note content' },
+                            type: { type: 'string', description: 'Note type (e.g. note, call, email)' },
+                        },
+                        required: ['contact_id', 'note'],
+                    },
+                },
+                {
+                    name: 'fluentcrm_delete_contact_note',
+                    description: 'Delete a note from a FluentCRM contact.',
+                    inputSchema: {
+                        type: 'object',
+                        properties: {
+                            note_id: { type: 'number', description: 'Note ID to delete' },
+                        },
+                        required: ['note_id'],
+                    },
+                },
+                {
+                    name: 'fluentcrm_bulk_upsert_contacts',
+                    description: 'Create or update multiple contacts at once.',
+                    inputSchema: {
+                        type: 'object',
+                        properties: {
+                            contacts: {
+                                type: 'array',
+                                items: { type: 'object' },
+                                description: 'Array of contact objects (email required for each)',
+                            },
+                            tags: { type: 'array', items: { type: 'string' }, description: 'Tag slugs to apply to all contacts' },
+                            lists: { type: 'array', items: { type: 'string' }, description: 'List slugs to apply to all contacts' },
+                        },
+                        required: ['contacts'],
+                    },
+                },
+                {
+                    name: 'fluentcrm_apply_segments',
+                    description: 'Apply or remove tags and lists from a set of contacts.',
+                    inputSchema: {
+                        type: 'object',
+                        properties: {
+                            contact_ids: { type: 'array', items: { type: 'number' }, description: 'Contact IDs' },
+                            attach_tags: { type: 'array', items: { type: 'number' }, description: 'Tag IDs to attach' },
+                            detach_tags: { type: 'array', items: { type: 'number' }, description: 'Tag IDs to detach' },
+                            attach_lists: { type: 'array', items: { type: 'number' }, description: 'List IDs to attach' },
+                            detach_lists: { type: 'array', items: { type: 'number' }, description: 'List IDs to detach' },
+                        },
+                        required: ['contact_ids'],
+                    },
+                },
+                {
+                    name: 'fluentcrm_get_campaign_detail',
+                    description: 'Get full details of a FluentCRM campaign by ID (uses native PHP, richer data than REST API).',
+                    inputSchema: {
+                        type: 'object',
+                        properties: {
+                            id: { type: 'number', description: 'Campaign ID' },
+                        },
+                        required: ['id'],
+                    },
+                },
+                {
+                    name: 'fluentcrm_upsert_campaign',
+                    description: 'Create or update a FluentCRM email campaign.',
+                    inputSchema: {
+                        type: 'object',
+                        properties: {
+                            id: { type: 'number', description: 'Campaign ID (omit to create)' },
+                            title: { type: 'string', description: 'Campaign title' },
+                            subject: { type: 'string', description: 'Email subject line' },
+                            template_id: { type: 'number', description: 'Email template ID' },
+                            settings: { type: 'object', description: 'Additional campaign settings' },
+                        },
+                        required: ['title', 'subject'],
+                    },
+                },
+                {
+                    name: 'fluentcrm_change_campaign_status',
+                    description: 'Change the status of a FluentCRM campaign (e.g. draft, scheduled, active, paused).',
+                    inputSchema: {
+                        type: 'object',
+                        properties: {
+                            campaign_id: { type: 'number', description: 'Campaign ID' },
+                            status: { type: 'string', description: 'New status: draft | scheduled | active | paused | archived' },
+                        },
+                        required: ['campaign_id', 'status'],
+                    },
+                },
+                {
+                    name: 'fluentcrm_manage_tag',
+                    description: 'Create, update, or delete a FluentCRM tag.',
+                    inputSchema: {
+                        type: 'object',
+                        properties: {
+                            action: { type: 'string', description: 'create | update | delete' },
+                            id: { type: 'number', description: 'Tag ID (required for update/delete)' },
+                            title: { type: 'string', description: 'Tag title' },
+                            slug: { type: 'string', description: 'Tag slug' },
+                        },
+                        required: ['action'],
+                    },
+                },
+                {
+                    name: 'fluentcrm_manage_list',
+                    description: 'Create, update, or delete a FluentCRM contact list.',
+                    inputSchema: {
+                        type: 'object',
+                        properties: {
+                            action: { type: 'string', description: 'create | update | delete' },
+                            id: { type: 'number', description: 'List ID (required for update/delete)' },
+                            title: { type: 'string', description: 'List title' },
+                            slug: { type: 'string', description: 'List slug' },
+                        },
+                        required: ['action'],
+                    },
+                },
             ],
         };
     });
@@ -1333,6 +1547,31 @@ function createMcpServer(client) {
                     return { content: [{ type: 'text', text: JSON.stringify({ shortcode: client.generateSmartLinkShortcode(args?.slug, args?.linkText) }, null, 2) }] };
                 case 'fluentcrm_validate_smart_link_data':
                     return { content: [{ type: 'text', text: JSON.stringify(client.validateSmartLinkData(args), null, 2) }] };
+                // ===== BLOCKLI NATIVE PHP TOOLS =====
+                case 'fluentcrm_get_crm_context':
+                    return { content: [{ type: 'text', text: JSON.stringify(await client.getCrmContext(), null, 2) }] };
+                case 'fluentcrm_send_email':
+                    return { content: [{ type: 'text', text: JSON.stringify(await client.sendEmail(args), null, 2) }] };
+                case 'fluentcrm_send_test_email':
+                    return { content: [{ type: 'text', text: JSON.stringify(await client.sendTestEmail(args), null, 2) }] };
+                case 'fluentcrm_add_contact_note':
+                    return { content: [{ type: 'text', text: JSON.stringify(await client.addContactNote(args), null, 2) }] };
+                case 'fluentcrm_delete_contact_note':
+                    return { content: [{ type: 'text', text: JSON.stringify(await client.deleteContactNote(args?.note_id), null, 2) }] };
+                case 'fluentcrm_bulk_upsert_contacts':
+                    return { content: [{ type: 'text', text: JSON.stringify(await client.bulkUpsertContacts(args), null, 2) }] };
+                case 'fluentcrm_apply_segments':
+                    return { content: [{ type: 'text', text: JSON.stringify(await client.applySegments(args), null, 2) }] };
+                case 'fluentcrm_get_campaign_detail':
+                    return { content: [{ type: 'text', text: JSON.stringify(await client.getBlockliCampaign(args?.id), null, 2) }] };
+                case 'fluentcrm_upsert_campaign':
+                    return { content: [{ type: 'text', text: JSON.stringify(await client.upsertCampaign(args), null, 2) }] };
+                case 'fluentcrm_change_campaign_status':
+                    return { content: [{ type: 'text', text: JSON.stringify(await client.changeCampaignStatus(args), null, 2) }] };
+                case 'fluentcrm_manage_tag':
+                    return { content: [{ type: 'text', text: JSON.stringify(await client.manageTag(args), null, 2) }] };
+                case 'fluentcrm_manage_list':
+                    return { content: [{ type: 'text', text: JSON.stringify(await client.manageList(args), null, 2) }] };
                 default:
                     throw new Error(`Unknown tool: ${name}`);
             }
