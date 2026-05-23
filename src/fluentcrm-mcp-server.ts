@@ -15,6 +15,12 @@ const FLUENTCRM_API_URL = process.env.FLUENTCRM_API_URL || 'https://your-domain.
 const FLUENTCRM_API_USERNAME = process.env.FLUENTCRM_API_USERNAME || '';
 const FLUENTCRM_API_PASSWORD = process.env.FLUENTCRM_API_PASSWORD || '';
 
+// Blockli direct-PHP endpoint base — derived automatically from the FluentCRM
+// API URL (strip /fluent-crm/v2, append blockli_assistant/v1).
+// Override with BLOCKLI_API_URL if the site structure differs.
+const BLOCKLI_API_URL = process.env.BLOCKLI_API_URL ||
+  FLUENTCRM_API_URL.replace(/\/fluent-crm\/v2\/?$/, '') + '/wp-json/blockli_assistant/v1';
+
 /**
  * FluentCRM API Client
  * Based on: https://rest-api.fluentcrm.com/#introduction
@@ -461,6 +467,95 @@ class FluentCRMClient {
   }
 }
 
+// ===== BLOCKLI DIRECT-PHP CLIENT =====
+// Calls blockli_assistant/v1/fluentcrm/* endpoints which invoke FluentCRM's
+// internal MCP Tool PHP classes directly — no REST API overhead.
+
+class BlockliFluentCRMClient {
+  private apiClient: AxiosInstance;
+
+  constructor(baseURL: string, username: string, password: string) {
+    const credentials = Buffer.from(`${username}:${password}`).toString('base64');
+    this.apiClient = axios.create({
+      baseURL,
+      headers: {
+        'Authorization': `Basic ${credentials}`,
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+      },
+      timeout: 30000,
+    });
+
+    this.apiClient.interceptors.response.use(
+      response => response,
+      error => {
+        const message = error.response?.data?.error || error.response?.data?.message || error.message;
+        throw new Error(`Blockli FluentCRM Error: ${message}`);
+      }
+    );
+  }
+
+  async getCrmContext() {
+    const response = await this.apiClient.get('/fluentcrm/crm-context');
+    return response.data;
+  }
+
+  async sendEmail(data: any) {
+    const response = await this.apiClient.post('/fluentcrm/send-email', data);
+    return response.data;
+  }
+
+  async sendTestEmail(data: any) {
+    const response = await this.apiClient.post('/fluentcrm/send-test-email', data);
+    return response.data;
+  }
+
+  async addContactNote(data: any) {
+    const response = await this.apiClient.post('/fluentcrm/add-contact-note', data);
+    return response.data;
+  }
+
+  async deleteContactNote(noteId: number) {
+    const response = await this.apiClient.post('/fluentcrm/delete-contact-note', { note_id: noteId });
+    return response.data;
+  }
+
+  async bulkUpsertContacts(data: any) {
+    const response = await this.apiClient.post('/fluentcrm/bulk-upsert-contacts', data);
+    return response.data;
+  }
+
+  async applySegments(data: any) {
+    const response = await this.apiClient.post('/fluentcrm/apply-segments', data);
+    return response.data;
+  }
+
+  async getCampaign(campaignId: number) {
+    const response = await this.apiClient.get(`/fluentcrm/campaigns/${campaignId}`);
+    return response.data;
+  }
+
+  async upsertCampaign(data: any) {
+    const response = await this.apiClient.post('/fluentcrm/upsert-campaign', data);
+    return response.data;
+  }
+
+  async changeCampaignStatus(data: any) {
+    const response = await this.apiClient.post('/fluentcrm/change-campaign-status', data);
+    return response.data;
+  }
+
+  async manageTag(data: any) {
+    const response = await this.apiClient.post('/fluentcrm/manage-tag', data);
+    return response.data;
+  }
+
+  async manageList(data: any) {
+    const response = await this.apiClient.post('/fluentcrm/manage-list', data);
+    return response.data;
+  }
+}
+
 // ===== MCP SERVER SETUP =====
 
 const server = new Server(
@@ -477,6 +572,12 @@ const server = new Server(
 
 const client = new FluentCRMClient(
   FLUENTCRM_API_URL,
+  FLUENTCRM_API_USERNAME,
+  FLUENTCRM_API_PASSWORD
+);
+
+const blockliClient = new BlockliFluentCRMClient(
+  BLOCKLI_API_URL,
   FLUENTCRM_API_USERNAME,
   FLUENTCRM_API_PASSWORD
 );
@@ -933,6 +1034,189 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
           properties: {},
         },
       },
+
+      // ===== BLOCKLI DIRECT-PHP TOOLS =====
+      // These call FluentCRM internal PHP classes directly via blockli_assistant/v1
+      // — functionality not available through the FluentCRM REST API.
+
+      {
+        name: 'fluentcrm_get_crm_context',
+        description: 'Get full CRM context for AI agents: enums, tags, lists, custom field schema, smart codes, capabilities, guidelines, and default sender. Call this first to understand the CRM before acting.',
+        inputSchema: { type: 'object', properties: {} },
+      },
+      {
+        name: 'fluentcrm_send_email',
+        description: 'Send a one-off email to a subscribed contact. Routes through FluentSMTP and the normal queue. SmartCodes resolve. Creates a hidden campaign record.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            contact_id:       { type: 'number', description: 'Provide this OR email.' },
+            email:            { type: 'string', description: 'Provide this OR contact_id.' },
+            subject:          { type: 'string' },
+            body:             { type: 'string', description: 'HTML or plain. SmartCodes resolve.' },
+            pre_header:       { type: 'string' },
+            design_template:  { type: 'string', description: 'e.g. classic, simple, raw_classic.' },
+            from_name:        { type: 'string' },
+            from_email:       { type: 'string' },
+            is_transactional: { type: 'string', enum: ['yes', 'no'] },
+          },
+          required: ['subject', 'body'],
+        },
+      },
+      {
+        name: 'fluentcrm_send_test_email',
+        description: "Render and send a test copy of an email. Does not create a real campaign. Subject is prefixed with 'TEST:'.",
+        inputSchema: {
+          type: 'object',
+          properties: {
+            to_email:        { type: 'string', description: "Defaults to the current WP user's email." },
+            campaign_id:     { type: 'number', description: 'Send a test of this campaign.' },
+            subject:         { type: 'string', description: 'Override or supply subject when not using campaign_id.' },
+            body:            { type: 'string' },
+            design_template: { type: 'string' },
+          },
+        },
+      },
+      {
+        name: 'fluentcrm_add_contact_note',
+        description: 'Add a note to a contact. Supports types: note, call, email, meeting, quote.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            contact_id:  { type: 'number', description: 'Provide this OR email.' },
+            email:       { type: 'string', description: 'Provide this OR contact_id.' },
+            type:        { type: 'string', enum: ['note', 'call', 'email', 'meeting', 'quote'] },
+            title:       { type: 'string' },
+            description: { type: 'string', description: 'HTML or plain.' },
+            created_at:  { type: 'string', description: 'ISO 8601, defaults to now.' },
+          },
+          required: ['title', 'description'],
+        },
+      },
+      {
+        name: 'fluentcrm_delete_contact_note',
+        description: 'Delete a contact note by its ID. Find note IDs via fluentcrm_get_contact.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            note_id: { type: 'number', description: 'ID of the note to delete.' },
+          },
+          required: ['note_id'],
+        },
+      },
+      {
+        name: 'fluentcrm_bulk_upsert_contacts',
+        description: 'Batch create or update up to 500 contacts. Returns per-row {created, updated, skipped, invalid} stats.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            contacts:          { type: 'array', description: 'Array of contact objects.', items: { type: 'object' } },
+            if_exists:         { type: 'string', enum: ['merge', 'skip', 'error'], description: 'Default: merge.' },
+            double_optin:      { type: 'boolean' },
+            auto_create_tags:  { type: 'boolean' },
+            auto_create_lists: { type: 'boolean' },
+          },
+          required: ['contacts'],
+        },
+      },
+      {
+        name: 'fluentcrm_apply_segments',
+        description: 'Add or remove tags and lists across many contacts at once. Provide contact_ids OR a filter. Use dry_run first for filter-based applies.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            contact_ids:       { type: 'array', items: { type: 'number' }, description: 'Explicit IDs. Use OR filter, not both.' },
+            filter:            { type: 'object', description: '{tags, lists, statuses, contact_type, search, created_after, created_before}' },
+            add_tags:          { type: 'array', items: { type: 'string' } },
+            remove_tags:       { type: 'array', items: { type: 'string' } },
+            add_lists:         { type: 'array', items: { type: 'string' } },
+            remove_lists:      { type: 'array', items: { type: 'string' } },
+            auto_create_tags:  { type: 'boolean' },
+            auto_create_lists: { type: 'boolean' },
+            dry_run:           { type: 'boolean', description: 'Preview without applying.' },
+          },
+        },
+      },
+      {
+        name: 'fluentcrm_get_campaign_detail',
+        description: 'Get detailed info for a single campaign including stats, subjects, revenue, and link report.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            campaign_id: { type: 'number' },
+          },
+          required: ['campaign_id'],
+        },
+      },
+      {
+        name: 'fluentcrm_upsert_campaign',
+        description: 'Create or update a campaign (never sends — use fluentcrm_change_campaign_status to schedule). Supports A/B subjects, custom recipients, UTM, and settings.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            campaign_id:      { type: 'number', description: 'Omit to create.' },
+            title:            { type: 'string' },
+            email_subject:    { type: 'string' },
+            email_pre_header: { type: 'string' },
+            email_body:       { type: 'string' },
+            design_template:  { type: 'string' },
+            settings:         { type: 'object' },
+            recipients:       { type: 'object', description: '{tags: [], lists: []}' },
+            subjects:         { type: 'array', items: { type: 'object' }, description: 'A/B subjects: [{value: string}]' },
+          },
+        },
+      },
+      {
+        name: 'fluentcrm_change_campaign_status',
+        description: "Change a campaign's state: schedule, unschedule, pause, resume, duplicate, or delete.",
+        inputSchema: {
+          type: 'object',
+          properties: {
+            campaign_id:    { type: 'number' },
+            action:         { type: 'string', enum: ['schedule', 'unschedule', 'pause', 'resume', 'duplicate', 'delete'] },
+            scheduled_at:   { type: 'string', description: 'ISO 8601, required for schedule action.' },
+            sending_type:   { type: 'string', enum: ['instant', 'schedule', 'range_schedule'] },
+            new_title:      { type: 'string', description: 'duplicate only — override auto title.' },
+          },
+          required: ['campaign_id', 'action'],
+        },
+      },
+      {
+        name: 'fluentcrm_manage_tag',
+        description: 'Create, update, delete, or merge tags. Delete and merge are destructive.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            action:       { type: 'string', enum: ['create', 'update', 'delete', 'merge'] },
+            tag_id:       { type: 'number', description: 'Required for update/delete.' },
+            title:        { type: 'string' },
+            slug:         { type: 'string' },
+            description:  { type: 'string' },
+            force:        { type: 'boolean', description: 'delete — allow deletion when subscribers are attached.' },
+            from_tag_ids: { type: 'array', items: { type: 'number' }, description: 'merge — source tag IDs.' },
+            to_tag_id:    { type: 'number', description: 'merge — destination tag ID.' },
+          },
+          required: ['action'],
+        },
+      },
+      {
+        name: 'fluentcrm_manage_list',
+        description: 'Create, update, delete, or merge lists. Delete and merge are destructive.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            action:        { type: 'string', enum: ['create', 'update', 'delete', 'merge'] },
+            list_id:       { type: 'number', description: 'Required for update/delete.' },
+            title:         { type: 'string' },
+            slug:          { type: 'string' },
+            description:   { type: 'string' },
+            force:         { type: 'boolean' },
+            from_list_ids: { type: 'array', items: { type: 'number' }, description: 'merge — source list IDs.' },
+            to_list_id:    { type: 'number', description: 'merge — destination list ID.' },
+          },
+          required: ['action'],
+        },
+      },
     ],
   };
 });
@@ -1016,7 +1300,45 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         return { content: [{ type: 'text', text: JSON.stringify({ shortcode: client.generateSmartLinkShortcode((args as any)?.slug, (args as any)?.linkText) }, null, 2) }] };
       case 'fluentcrm_validate_smart_link_data':
         return { content: [{ type: 'text', text: JSON.stringify(client.validateSmartLinkData(args as any), null, 2) }] };
-      
+
+      // ===== BLOCKLI DIRECT-PHP TOOLS =====
+
+      case 'fluentcrm_get_crm_context':
+        return { content: [{ type: 'text', text: JSON.stringify(await blockliClient.getCrmContext(), null, 2) }] };
+
+      case 'fluentcrm_send_email':
+        return { content: [{ type: 'text', text: JSON.stringify(await blockliClient.sendEmail(args as any), null, 2) }] };
+
+      case 'fluentcrm_send_test_email':
+        return { content: [{ type: 'text', text: JSON.stringify(await blockliClient.sendTestEmail(args as any), null, 2) }] };
+
+      case 'fluentcrm_add_contact_note':
+        return { content: [{ type: 'text', text: JSON.stringify(await blockliClient.addContactNote(args as any), null, 2) }] };
+
+      case 'fluentcrm_delete_contact_note':
+        return { content: [{ type: 'text', text: JSON.stringify(await blockliClient.deleteContactNote((args as any)?.note_id), null, 2) }] };
+
+      case 'fluentcrm_bulk_upsert_contacts':
+        return { content: [{ type: 'text', text: JSON.stringify(await blockliClient.bulkUpsertContacts(args as any), null, 2) }] };
+
+      case 'fluentcrm_apply_segments':
+        return { content: [{ type: 'text', text: JSON.stringify(await blockliClient.applySegments(args as any), null, 2) }] };
+
+      case 'fluentcrm_get_campaign_detail':
+        return { content: [{ type: 'text', text: JSON.stringify(await blockliClient.getCampaign((args as any)?.campaign_id), null, 2) }] };
+
+      case 'fluentcrm_upsert_campaign':
+        return { content: [{ type: 'text', text: JSON.stringify(await blockliClient.upsertCampaign(args as any), null, 2) }] };
+
+      case 'fluentcrm_change_campaign_status':
+        return { content: [{ type: 'text', text: JSON.stringify(await blockliClient.changeCampaignStatus(args as any), null, 2) }] };
+
+      case 'fluentcrm_manage_tag':
+        return { content: [{ type: 'text', text: JSON.stringify(await blockliClient.manageTag(args as any), null, 2) }] };
+
+      case 'fluentcrm_manage_list':
+        return { content: [{ type: 'text', text: JSON.stringify(await blockliClient.manageList(args as any), null, 2) }] };
+
       default:
         throw new Error(`Unknown tool: ${name}`);
     }
