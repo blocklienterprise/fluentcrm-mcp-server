@@ -1300,27 +1300,30 @@ function createMcpServer(client) {
                 },
                 {
                     name: 'fluentcrm_send_email',
-                    description: 'Send a FluentCRM email to a contact using a template.',
+                    description: 'Send a one-off transactional or marketing email to a FluentCRM contact. Contact must be in subscribed or transactional status.',
                     inputSchema: {
                         type: 'object',
                         properties: {
-                            contact_id: { type: 'number', description: 'Contact ID' },
-                            template_id: { type: 'number', description: 'Email template ID' },
-                            subject: { type: 'string', description: 'Email subject (overrides template)' },
+                            contact_id: { type: 'number', description: 'Contact ID (use this or email)' },
+                            email: { type: 'string', description: 'Contact email (alternative to contact_id)' },
+                            subject: { type: 'string', description: 'Email subject line' },
+                            body: { type: 'string', description: 'Email body HTML or plain text' },
+                            design_template: { type: 'string', description: 'Template style: classic | simple | raw_html (default: classic)' },
+                            is_transactional: { type: 'string', description: 'yes | no — use yes for transactional (no unsubscribe footer)' },
                         },
-                        required: ['contact_id', 'template_id'],
+                        required: ['subject', 'body'],
                     },
                 },
                 {
                     name: 'fluentcrm_send_test_email',
-                    description: 'Send a test email for a campaign or template.',
+                    description: 'Send a test preview of a campaign email to one or more addresses. Does not enroll recipients or count in stats.',
                     inputSchema: {
                         type: 'object',
                         properties: {
                             campaign_id: { type: 'number', description: 'Campaign ID' },
-                            email: { type: 'string', description: 'Recipient email address for testing' },
+                            emails: { type: 'array', items: { type: 'string' }, description: 'Recipient email addresses for testing' },
                         },
-                        required: ['campaign_id', 'email'],
+                        required: ['campaign_id', 'emails'],
                     },
                 },
                 {
@@ -1330,10 +1333,12 @@ function createMcpServer(client) {
                         type: 'object',
                         properties: {
                             contact_id: { type: 'number', description: 'Contact ID' },
-                            note: { type: 'string', description: 'Note content' },
-                            type: { type: 'string', description: 'Note type (e.g. note, call, email)' },
+                            email: { type: 'string', description: 'Contact email (alternative to contact_id)' },
+                            title: { type: 'string', description: 'Note title / heading' },
+                            description: { type: 'string', description: 'Note body / content' },
+                            type: { type: 'string', description: 'Note type: note | call | email | meeting | quote (default: note)' },
                         },
-                        required: ['contact_id', 'note'],
+                        required: ['title', 'description'],
                     },
                 },
                 {
@@ -1366,17 +1371,17 @@ function createMcpServer(client) {
                 },
                 {
                     name: 'fluentcrm_apply_segments',
-                    description: 'Apply or remove tags and lists from a set of contacts.',
+                    description: 'Apply or remove tags and lists from a set of contacts. Tag/list values can be IDs (numbers) or names (strings).',
                     inputSchema: {
                         type: 'object',
                         properties: {
-                            contact_ids: { type: 'array', items: { type: 'number' }, description: 'Contact IDs' },
-                            attach_tags: { type: 'array', items: { type: 'number' }, description: 'Tag IDs to attach' },
-                            detach_tags: { type: 'array', items: { type: 'number' }, description: 'Tag IDs to detach' },
-                            attach_lists: { type: 'array', items: { type: 'number' }, description: 'List IDs to attach' },
-                            detach_lists: { type: 'array', items: { type: 'number' }, description: 'List IDs to detach' },
+                            contact_ids: { type: 'array', items: { type: 'number' }, description: 'Contact IDs to target (mutually exclusive with filter)' },
+                            add_tags: { type: 'array', items: {}, description: 'Tag IDs or names to add' },
+                            remove_tags: { type: 'array', items: {}, description: 'Tag IDs or names to remove' },
+                            add_lists: { type: 'array', items: {}, description: 'List IDs or names to add' },
+                            remove_lists: { type: 'array', items: {}, description: 'List IDs or names to remove' },
+                            dry_run: { type: 'boolean', description: 'Preview changes without applying' },
                         },
-                        required: ['contact_ids'],
                     },
                 },
                 {
