@@ -15,11 +15,7 @@ const FLUENTCRM_API_URL = process.env.FLUENTCRM_API_URL || 'https://your-domain.
 const FLUENTCRM_API_USERNAME = process.env.FLUENTCRM_API_USERNAME || '';
 const FLUENTCRM_API_PASSWORD = process.env.FLUENTCRM_API_PASSWORD || '';
 
-// Blockli direct-PHP endpoint base — derived automatically from the FluentCRM
-// API URL (strip /fluent-crm/v2, append blockli_assistant/v1).
-// Override with BLOCKLI_API_URL if the site structure differs.
-const BLOCKLI_API_URL = process.env.BLOCKLI_API_URL ||
-  FLUENTCRM_API_URL.replace(/\/fluent-crm\/v2\/?$/, '') + '/wp-json/blockli_assistant/v1';
+
 
 /**
  * FluentCRM API Client
@@ -27,30 +23,36 @@ const BLOCKLI_API_URL = process.env.BLOCKLI_API_URL ||
  */
 class FluentCRMClient {
   private apiClient: AxiosInstance;
+  private blockliApiClient: AxiosInstance;
   private baseURL: string;
 
   constructor(baseURL: string, username: string, password: string) {
     this.baseURL = baseURL;
-    
-    // Basic Auth dla FluentCRM API
-    const credentials = Buffer.from(`${username}:${password}`).toString('base64');
-    
-    this.apiClient = axios.create({
-      baseURL,
-      headers: {
-        'Authorization': `Basic ${credentials}`,
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-      },
-      timeout: 30000,
-    });
 
-    // Error interceptor
+    const credentials = Buffer.from(`${username}:${password}`).toString('base64');
+    const authHeaders = {
+      'Authorization': `Basic ${credentials}`,
+      'Content-Type': 'application/json',
+      'Accept': 'application/json',
+    };
+
+    this.apiClient = axios.create({ baseURL, headers: authHeaders, timeout: 30000 });
     this.apiClient.interceptors.response.use(
       response => response,
       error => {
         const message = error.response?.data?.message || error.message;
         throw new Error(`FluentCRM API Error: ${message}`);
+      }
+    );
+
+    // Same WordPress site, blockli_assistant/v1 namespace
+    const blockliBase = baseURL.replace(/\/fluent-crm\/v2\/?$/, '') + '/wp-json/blockli_assistant/v1';
+    this.blockliApiClient = axios.create({ baseURL: blockliBase, headers: authHeaders, timeout: 30000 });
+    this.blockliApiClient.interceptors.response.use(
+      response => response,
+      error => {
+        const message = error.response?.data?.error || error.response?.data?.message || error.message;
+        throw new Error(`Blockli API Error: ${message}`);
       }
     );
   }
@@ -465,94 +467,55 @@ class FluentCRMClient {
     const response = await this.apiClient.get('/reports/subscribers-growth-rate', { params });
     return response.data;
   }
-}
 
-// ===== BLOCKLI DIRECT-PHP CLIENT =====
-// Calls blockli_assistant/v1/fluentcrm/* endpoints which invoke FluentCRM's
-// internal MCP Tool PHP classes directly — no REST API overhead.
-
-class BlockliFluentCRMClient {
-  private apiClient: AxiosInstance;
-
-  constructor(baseURL: string, username: string, password: string) {
-    const credentials = Buffer.from(`${username}:${password}`).toString('base64');
-    this.apiClient = axios.create({
-      baseURL,
-      headers: {
-        'Authorization': `Basic ${credentials}`,
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-      },
-      timeout: 30000,
-    });
-
-    this.apiClient.interceptors.response.use(
-      response => response,
-      error => {
-        const message = error.response?.data?.error || error.response?.data?.message || error.message;
-        throw new Error(`Blockli FluentCRM Error: ${message}`);
-      }
-    );
-  }
+  // ===== BLOCKLI DIRECT-PHP ENDPOINTS (blockli_assistant/v1) =====
 
   async getCrmContext() {
-    const response = await this.apiClient.get('/fluentcrm/crm-context');
-    return response.data;
+    return (await this.blockliApiClient.get('/fluentcrm/crm-context')).data;
   }
 
   async sendEmail(data: any) {
-    const response = await this.apiClient.post('/fluentcrm/send-email', data);
-    return response.data;
+    return (await this.blockliApiClient.post('/fluentcrm/send-email', data)).data;
   }
 
   async sendTestEmail(data: any) {
-    const response = await this.apiClient.post('/fluentcrm/send-test-email', data);
-    return response.data;
+    return (await this.blockliApiClient.post('/fluentcrm/send-test-email', data)).data;
   }
 
   async addContactNote(data: any) {
-    const response = await this.apiClient.post('/fluentcrm/add-contact-note', data);
-    return response.data;
+    return (await this.blockliApiClient.post('/fluentcrm/add-contact-note', data)).data;
   }
 
   async deleteContactNote(noteId: number) {
-    const response = await this.apiClient.post('/fluentcrm/delete-contact-note', { note_id: noteId });
-    return response.data;
+    return (await this.blockliApiClient.post('/fluentcrm/delete-contact-note', { note_id: noteId })).data;
   }
 
   async bulkUpsertContacts(data: any) {
-    const response = await this.apiClient.post('/fluentcrm/bulk-upsert-contacts', data);
-    return response.data;
+    return (await this.blockliApiClient.post('/fluentcrm/bulk-upsert-contacts', data)).data;
   }
 
   async applySegments(data: any) {
-    const response = await this.apiClient.post('/fluentcrm/apply-segments', data);
-    return response.data;
+    return (await this.blockliApiClient.post('/fluentcrm/apply-segments', data)).data;
   }
 
-  async getCampaign(campaignId: number) {
-    const response = await this.apiClient.get(`/fluentcrm/campaigns/${campaignId}`);
-    return response.data;
+  async getBlockliCampaign(campaignId: number) {
+    return (await this.blockliApiClient.get(`/fluentcrm/campaigns/${campaignId}`)).data;
   }
 
   async upsertCampaign(data: any) {
-    const response = await this.apiClient.post('/fluentcrm/upsert-campaign', data);
-    return response.data;
+    return (await this.blockliApiClient.post('/fluentcrm/upsert-campaign', data)).data;
   }
 
   async changeCampaignStatus(data: any) {
-    const response = await this.apiClient.post('/fluentcrm/change-campaign-status', data);
-    return response.data;
+    return (await this.blockliApiClient.post('/fluentcrm/change-campaign-status', data)).data;
   }
 
   async manageTag(data: any) {
-    const response = await this.apiClient.post('/fluentcrm/manage-tag', data);
-    return response.data;
+    return (await this.blockliApiClient.post('/fluentcrm/manage-tag', data)).data;
   }
 
   async manageList(data: any) {
-    const response = await this.apiClient.post('/fluentcrm/manage-list', data);
-    return response.data;
+    return (await this.blockliApiClient.post('/fluentcrm/manage-list', data)).data;
   }
 }
 
@@ -572,12 +535,6 @@ const server = new Server(
 
 const client = new FluentCRMClient(
   FLUENTCRM_API_URL,
-  FLUENTCRM_API_USERNAME,
-  FLUENTCRM_API_PASSWORD
-);
-
-const blockliClient = new BlockliFluentCRMClient(
-  BLOCKLI_API_URL,
   FLUENTCRM_API_USERNAME,
   FLUENTCRM_API_PASSWORD
 );
@@ -1304,40 +1261,40 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       // ===== BLOCKLI DIRECT-PHP TOOLS =====
 
       case 'fluentcrm_get_crm_context':
-        return { content: [{ type: 'text', text: JSON.stringify(await blockliClient.getCrmContext(), null, 2) }] };
+        return { content: [{ type: 'text', text: JSON.stringify(await client.getCrmContext(), null, 2) }] };
 
       case 'fluentcrm_send_email':
-        return { content: [{ type: 'text', text: JSON.stringify(await blockliClient.sendEmail(args as any), null, 2) }] };
+        return { content: [{ type: 'text', text: JSON.stringify(await client.sendEmail(args as any), null, 2) }] };
 
       case 'fluentcrm_send_test_email':
-        return { content: [{ type: 'text', text: JSON.stringify(await blockliClient.sendTestEmail(args as any), null, 2) }] };
+        return { content: [{ type: 'text', text: JSON.stringify(await client.sendTestEmail(args as any), null, 2) }] };
 
       case 'fluentcrm_add_contact_note':
-        return { content: [{ type: 'text', text: JSON.stringify(await blockliClient.addContactNote(args as any), null, 2) }] };
+        return { content: [{ type: 'text', text: JSON.stringify(await client.addContactNote(args as any), null, 2) }] };
 
       case 'fluentcrm_delete_contact_note':
-        return { content: [{ type: 'text', text: JSON.stringify(await blockliClient.deleteContactNote((args as any)?.note_id), null, 2) }] };
+        return { content: [{ type: 'text', text: JSON.stringify(await client.deleteContactNote((args as any)?.note_id), null, 2) }] };
 
       case 'fluentcrm_bulk_upsert_contacts':
-        return { content: [{ type: 'text', text: JSON.stringify(await blockliClient.bulkUpsertContacts(args as any), null, 2) }] };
+        return { content: [{ type: 'text', text: JSON.stringify(await client.bulkUpsertContacts(args as any), null, 2) }] };
 
       case 'fluentcrm_apply_segments':
-        return { content: [{ type: 'text', text: JSON.stringify(await blockliClient.applySegments(args as any), null, 2) }] };
+        return { content: [{ type: 'text', text: JSON.stringify(await client.applySegments(args as any), null, 2) }] };
 
       case 'fluentcrm_get_campaign_detail':
-        return { content: [{ type: 'text', text: JSON.stringify(await blockliClient.getCampaign((args as any)?.campaign_id), null, 2) }] };
+        return { content: [{ type: 'text', text: JSON.stringify(await client.getBlockliCampaign((args as any)?.campaign_id), null, 2) }] };
 
       case 'fluentcrm_upsert_campaign':
-        return { content: [{ type: 'text', text: JSON.stringify(await blockliClient.upsertCampaign(args as any), null, 2) }] };
+        return { content: [{ type: 'text', text: JSON.stringify(await client.upsertCampaign(args as any), null, 2) }] };
 
       case 'fluentcrm_change_campaign_status':
-        return { content: [{ type: 'text', text: JSON.stringify(await blockliClient.changeCampaignStatus(args as any), null, 2) }] };
+        return { content: [{ type: 'text', text: JSON.stringify(await client.changeCampaignStatus(args as any), null, 2) }] };
 
       case 'fluentcrm_manage_tag':
-        return { content: [{ type: 'text', text: JSON.stringify(await blockliClient.manageTag(args as any), null, 2) }] };
+        return { content: [{ type: 'text', text: JSON.stringify(await client.manageTag(args as any), null, 2) }] };
 
       case 'fluentcrm_manage_list':
-        return { content: [{ type: 'text', text: JSON.stringify(await blockliClient.manageList(args as any), null, 2) }] };
+        return { content: [{ type: 'text', text: JSON.stringify(await client.manageList(args as any), null, 2) }] };
 
       default:
         throw new Error(`Unknown tool: ${name}`);
