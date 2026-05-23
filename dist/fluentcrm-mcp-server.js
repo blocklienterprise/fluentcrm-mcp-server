@@ -1410,29 +1410,29 @@ function createMcpServer(client) {
                 },
                 {
                     name: 'fluentcrm_upsert_campaign',
-                    description: 'Create or update a FluentCRM email campaign.',
+                    description: 'Create or update a FluentCRM email campaign. title is required for create; campaign_id is required for update.',
                     inputSchema: {
                         type: 'object',
                         properties: {
-                            id: { type: 'number', description: 'Campaign ID (omit to create)' },
-                            title: { type: 'string', description: 'Campaign title' },
-                            subject: { type: 'string', description: 'Email subject line' },
-                            template_id: { type: 'number', description: 'Email template ID' },
-                            settings: { type: 'object', description: 'Additional campaign settings' },
+                            campaign_id: { type: 'number', description: 'Campaign ID (required for update; omit to create)' },
+                            title: { type: 'string', description: 'Campaign title (required for create)' },
+                            email_subject: { type: 'string', description: 'Email subject line' },
+                            email_pre_header: { type: 'string', description: 'Email pre-header / preview text' },
+                            email_body: { type: 'string', description: 'Email body HTML' },
+                            design_template: { type: 'string', description: 'Template style: classic | simple | raw_html' },
                         },
-                        required: ['title', 'subject'],
                     },
                 },
                 {
                     name: 'fluentcrm_change_campaign_status',
-                    description: 'Change the status of a FluentCRM campaign (e.g. draft, scheduled, active, paused).',
+                    description: 'Perform a lifecycle action on a FluentCRM campaign.',
                     inputSchema: {
                         type: 'object',
                         properties: {
                             campaign_id: { type: 'number', description: 'Campaign ID' },
-                            status: { type: 'string', description: 'New status: draft | scheduled | active | paused | archived' },
+                            action: { type: 'string', description: 'Action: schedule | unschedule | pause | resume | duplicate | delete' },
                         },
-                        required: ['campaign_id', 'status'],
+                        required: ['campaign_id', 'action'],
                     },
                 },
                 {
