@@ -1,13 +1,15 @@
 #!/usr/bin/env node
 
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
-import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
+import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import {
   CallToolRequestSchema,
   ListToolsRequestSchema,
 } from '@modelcontextprotocol/sdk/types.js';
 import axios, { AxiosInstance } from 'axios';
 import * as dotenv from 'dotenv';
+import { createServer, IncomingMessage, ServerResponse } from 'http';
+import { randomUUID } from 'crypto';
 
 dotenv.config();
 
@@ -521,6 +523,7 @@ class FluentCRMClient {
 
 // ===== MCP SERVER SETUP =====
 
+function createMcpServer(client: FluentCRMClient): Server {
 const server = new Server(
   {
     name: 'fluentcrm-mcp',
@@ -531,12 +534,6 @@ const server = new Server(
       tools: {},
     },
   }
-);
-
-const client = new FluentCRMClient(
-  FLUENTCRM_API_URL,
-  FLUENTCRM_API_USERNAME,
-  FLUENTCRM_API_PASSWORD
 );
 
 server.setRequestHandler(ListToolsRequestSchema, async () => {
@@ -1307,12 +1304,116 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
   }
 });
 
+return server;
+}
+
+// ─── HTTP transport (used on Render / any cloud host) ───────────────────────
+async function startHTTP(port: number): Promise<void> {
+  const transports = new Map<string, StreamableHTTPServerTransport>();
+  const AUTH_TOKEN = process.env.MCP_AUTH_TOKEN;
+
+  const readBody = (req: IncomingMessage): Promise<string> =>
+    new Promise((resolve, reject) => {
+      const chunks: Buffer[] = [];
+      req.on('data', (c: Buffer) => chunks.push(c));
+      req.on('end', () => resolve(Buffer.concat(chunks).toString()));
+      req.on('error', reject);
+    });
+
+  const httpServer = createServer(async (req: IncomingMessage, res: ServerResponse) => {
+    // Optional bearer-token auth
+    if (AUTH_TOKEN) {
+      const auth = req.headers['authorization'] || '';
+      if (!auth.startsWith('Bearer ') || auth.slice(7) !== AUTH_TOKEN) {
+        res.writeHead(401, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'Unauthorized' }));
+        return;
+      }
+    }
+
+    // Health-check endpoint
+    if (req.url === '/health' && req.method === 'GET') {
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ status: 'ok', server: 'fluentcrm-mcp' }));
+      return;
+    }
+
+    const url = new URL(req.url || '/', `http://localhost:${port}`);
+    if (url.pathname !== '/mcp') {
+      res.writeHead(404);
+      res.end();
+      return;
+    }
+
+    if (req.method === 'POST') {
+      const sessionId = req.headers['mcp-session-id'] as string | undefined;
+      let transport: StreamableHTTPServerTransport;
+
+      if (sessionId && transports.has(sessionId)) {
+        transport = transports.get(sessionId)!;
+      } else {
+        transport = new StreamableHTTPServerTransport({
+          sessionIdGenerator: () => randomUUID(),
+          onsessioninitialized: (sid) => { transports.set(sid, transport); },
+        });
+        transport.onclose = () => {
+          if (transport.sessionId) transports.delete(transport.sessionId);
+        };
+        const fcrmUrl  = (req.headers['x-fluentcrm-url']      as string) || FLUENTCRM_API_URL;
+        const fcrmUser = (req.headers['x-fluentcrm-username'] as string) || FLUENTCRM_API_USERNAME;
+        const fcrmPass = (req.headers['x-fluentcrm-password'] as string) || FLUENTCRM_API_PASSWORD;
+        const sessionClient = new FluentCRMClient(fcrmUrl, fcrmUser, fcrmPass);
+        const sessionServer = createMcpServer(sessionClient);
+        await sessionServer.connect(transport);
+      }
+
+      const rawBody = await readBody(req);
+      const body = JSON.parse(rawBody);
+      await transport.handleRequest(req, res, body);
+
+    } else if (req.method === 'GET') {
+      const sessionId = req.headers['mcp-session-id'] as string | undefined;
+      if (!sessionId || !transports.has(sessionId)) {
+        res.writeHead(400);
+        res.end('Invalid session ID');
+        return;
+      }
+      await transports.get(sessionId)!.handleRequest(req, res);
+
+    } else if (req.method === 'DELETE') {
+      const sessionId = req.headers['mcp-session-id'] as string | undefined;
+      if (sessionId && transports.has(sessionId)) {
+        await transports.get(sessionId)!.close();
+        transports.delete(sessionId);
+      }
+      res.writeHead(200);
+      res.end();
+
+    } else {
+      res.writeHead(405);
+      res.end();
+    }
+  });
+
+  httpServer.on('error', (err: NodeJS.ErrnoException) => {
+    console.error(`[fluentcrm] httpServer error: ${err.code} port=${port}`);
+    process.exit(1);
+  });
+  httpServer.listen(port, '0.0.0.0', () => {
+    console.error(`🚀 FluentCRM MCP Server running on HTTP port ${port}`);
+    console.error(`[fluentcrm] PORT env was: ${process.env.PORT}`);
+    console.error(`[fluentcrm] node: ${process.version}`);
+    console.error(`📡 MCP endpoint: http://0.0.0.0:${port}/mcp`);
+    console.error(`📡 FluentCRM API: ${FLUENTCRM_API_URL}`);
+    if (AUTH_TOKEN) console.error('🔒 Bearer auth enabled (MCP_AUTH_TOKEN is set)');
+    else console.error('⚠️  No MCP_AUTH_TOKEN set — endpoint is open');
+  });
+}
+
+// ─── Entrypoint ────────────────────────────────────────────────────────
 async function main() {
-  const transport = new StdioServerTransport();
-  await server.connect(transport);
-  console.error('🚀 FluentCRM MCP Server running on stdio');
-  console.error(`📡 API URL: ${FLUENTCRM_API_URL}`);
-  console.error(`👤 Username: ${FLUENTCRM_API_USERNAME}`);
+  const port = parseInt(process.env.PORT || '3001', 10);
+  await startHTTP(port);
 }
 
 main().catch((error) => {
