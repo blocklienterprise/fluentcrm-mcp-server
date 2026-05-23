@@ -57,7 +57,7 @@ class FluentCRMClient {
     });
 
     // Blockli Assistant REST API client — same WordPress site, same credentials
-    const blockliBase = baseURL.replace(/\/fluent-crm\/v2\/?$/, '') + '/wp-json/blockli_assistant/v1';
+    const blockliBase = baseURL.replace(/\/wp-json\/fluent-crm\/v2\/?$/, '') + '/wp-json/blockli_assistant/v1';
     this.blockliApiClient = axios.create({
       baseURL: blockliBase,
       headers: {
